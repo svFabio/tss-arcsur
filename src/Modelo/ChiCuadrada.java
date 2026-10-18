@@ -69,10 +69,21 @@ public class ChiCuadrada {
             matrizResultados[i + 1][cols + 1] = totalesFila[i];
         }
 
+        int minDim = Math.min(filas - 1, cols - 1);
+        double cramerV = (totalGeneral > 0 && minDim > 0) ? Math.sqrt(chiCuadrada / ((double) totalGeneral * minDim)) : 0.0;
+
         String conclusion = gradosLibertad > 0 ? "Valor Chi²: " + String.format("%.2f", chiCuadrada) + 
-                            " (Grados de libertad: " + gradosLibertad + ")" : "Datos insuficientes para Chi²";
+                            " (GL: " + gradosLibertad + ") | V de Cramér: " + String.format("%.3f", cramerV) + 
+                            " (" + interpretarCramer(cramerV) + ")" : "Datos insuficientes para Chi²";
 
         return new Object[]{matrizResultados, chiCuadrada, gradosLibertad, conclusion};
+    }
+
+    private static String interpretarCramer(double v) {
+        if (v < 0.10) return "Asociación despreciable";
+        if (v < 0.30) return "Asociación débil";
+        if (v < 0.50) return "Asociación moderada";
+        return "Asociación fuerte";
     }
 
     private static ArrayList<String> obtenerUnicos(ArrayList<String> lista) {

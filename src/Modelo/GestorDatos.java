@@ -1,8 +1,7 @@
 package Modelo;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 
 public class GestorDatos {
     private ArrayList<HashMap<String, String>> datosTitulados;
@@ -26,17 +25,15 @@ public class GestorDatos {
             }
             if (linea.startsWith("\uFEFF")) linea = linea.substring(1);
 
-            String[] columnas = linea.split(",");
-            for (int i = 0; i < columnas.length; i++) {
-                columnas[i] = columnas[i].trim();
-            }
+            ArrayList<String> columnasList = parsearLineaCSV(linea);
+            String[] columnas = columnasList.toArray(new String[0]);
 
             while ((linea = br.readLine()) != null) {
                 if (linea.trim().isEmpty()) continue;
-                String[] valores = linea.split(",", -1);
+                ArrayList<String> valores = parsearLineaCSV(linea);
                 HashMap<String, String> fila = new HashMap<>();
-                for (int i = 0; i < columnas.length && i < valores.length; i++) {
-                    fila.put(columnas[i], valores[i].trim());
+                for (int i = 0; i < columnas.length && i < valores.size(); i++) {
+                    fila.put(columnas[i], valores.get(i));
                 }
                 datos.add(fila);
             }
@@ -137,8 +134,80 @@ public class GestorDatos {
 
     public int getCantidadTitulados() { return datosTitulados.size(); }
     public int getCantidadEmpleadores() { return datosEmpleadores.size(); }
-    public String[] getColumnasTitulados() { return columnasTitulados; }
-    public String[] getColumnasEmpleadores() { return columnasEmpleadores; }
+    private static final Set<String> COLUMNAS_EXCLUIDAS = new HashSet<>(Arrays.asList(
+        // Identificadores y Contacto
+        "email", "emailcontacto", "telefono", "linkedin", "contacto",
+        // Nombres propios específicos
+        "nombreempresa", "nombreprograma",
+        // Campos de especificación abierta "Otro..."
+        "otrorubroorg", "otraareatrabajo", "otrocargo", "otramateriaventaja", "otramateriamenos",
+        // Párrafos cualitativos abiertos
+        "razondesempleo", "cargosdesempenados", "areasemergentes", "herramientastecnologicas", "habilidadesblandas"
+    ));
+
+    public static boolean esColumnaAnalizable(String nombreColumna) {
+        if (nombreColumna == null || nombreColumna.trim().isEmpty()) return false;
+        String clean = nombreColumna.trim().toLowerCase();
+        if (COLUMNAS_EXCLUIDAS.contains(clean)) return false;
+        if (clean.startsWith("otro") || clean.startsWith("otra")) return false;
+        return true;
+    }
+
+    public String[] getColumnasTitulados() {
+        return filtrarColumnasAnalizables(columnasTitulados);
+    }
+
+    public String[] getColumnasEmpleadores() {
+        return filtrarColumnasAnalizables(columnasEmpleadores);
+    }
+
+    public String[] getColumnasCompletasTitulados() {
+        return columnasTitulados;
+    }
+
+    public String[] getColumnasCompletasEmpleadores() {
+        return columnasEmpleadores;
+    }
+
+    private String[] filtrarColumnasAnalizables(String[] columnas) {
+        if (columnas == null) return new String[0];
+        ArrayList<String> filtradas = new ArrayList<>();
+        for (String col : columnas) {
+            if (esColumnaAnalizable(col)) {
+                filtradas.add(col);
+            }
+        }
+        return filtradas.toArray(new String[0]);
+    }
+
     public boolean hayDatosTitulados() { return !datosTitulados.isEmpty(); }
     public boolean hayDatosEmpleadores() { return !datosEmpleadores.isEmpty(); }
+
+    public static ArrayList<String> parsearLineaCSV(String linea) {
+        ArrayList<String> campos = new ArrayList<>();
+        if (linea == null) return campos;
+
+        StringBuilder sb = new StringBuilder();
+        boolean dentroComillas = false;
+
+        for (int i = 0; i < linea.length(); i++) {
+            char c = linea.charAt(i);
+
+            if (c == '"') {
+                if (dentroComillas && i + 1 < linea.length() && linea.charAt(i + 1) == '"') {
+                    sb.append('"');
+                    i++; // saltar comilla escapada ("")
+                } else {
+                    dentroComillas = !dentroComillas;
+                }
+            } else if (c == ',' && !dentroComillas) {
+                campos.add(sb.toString().trim());
+                sb.setLength(0);
+            } else {
+                sb.append(c);
+            }
+        }
+        campos.add(sb.toString().trim());
+        return campos;
+    }
 }

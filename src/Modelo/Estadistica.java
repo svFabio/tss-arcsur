@@ -30,11 +30,44 @@ public class Estadistica {
     }
 
     public static LinkedHashMap<String, Integer> frecuenciaAbsoluta(ArrayList<String> datos) {
-        LinkedHashMap<String, Integer> frecuencias = new LinkedHashMap<>();
+        boolean esMultiple = false;
         for (String d : datos) {
-            if (!d.isEmpty()) {
-                frecuencias.put(d, frecuencias.getOrDefault(d, 0) + 1);
+            if (d != null && d.contains(";")) {
+                esMultiple = true;
+                break;
             }
+        }
+
+        HashMap<String, Integer> conteo = new HashMap<>();
+        for (String d : datos) {
+            if (d == null) continue;
+            String trimmed = d.trim();
+            if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("N/a") || trimmed.equalsIgnoreCase("null")) continue;
+
+            if (esMultiple) {
+                String[] partes = trimmed.split(";");
+                for (String p : partes) {
+                    String clean = p.trim();
+                    if (!clean.isEmpty() && !clean.equalsIgnoreCase("N/a") && !clean.equalsIgnoreCase("null")) {
+                        conteo.put(clean, conteo.getOrDefault(clean, 0) + 1);
+                    }
+                }
+            } else {
+                conteo.put(trimmed, conteo.getOrDefault(trimmed, 0) + 1);
+            }
+        }
+
+        // Ordenar descendentemente por frecuencia y luego alfabéticamente
+        List<Map.Entry<String, Integer>> lista = new ArrayList<>(conteo.entrySet());
+        lista.sort((a, b) -> {
+            int comp = b.getValue().compareTo(a.getValue());
+            if (comp != 0) return comp;
+            return a.getKey().compareToIgnoreCase(b.getKey());
+        });
+
+        LinkedHashMap<String, Integer> frecuencias = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> entry : lista) {
+            frecuencias.put(entry.getKey(), entry.getValue());
         }
         return frecuencias;
     }
@@ -45,7 +78,7 @@ public class Estadistica {
         int total = 0;
         for (int v : absoluta.values()) total += v;
         for (Map.Entry<String, Integer> e : absoluta.entrySet()) {
-            relativa.put(e.getKey(), (double) e.getValue() / total * 100);
+            relativa.put(e.getKey(), total > 0 ? ((double) e.getValue() / total * 100) : 0.0);
         }
         return relativa;
     }

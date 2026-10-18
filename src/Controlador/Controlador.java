@@ -135,13 +135,16 @@ public class Controlador implements ActionListener {
             LinkedHashMap<String, Integer> frecuencias = Estadistica.frecuenciaAbsoluta(datosColumna);
             
             panel.modeloTabla.setRowCount(0);
-            int total = datosColumna.size();
+            int sumaFrecuencias = 0;
+            for (int val : frecuencias.values()) sumaFrecuencias += val;
+
             for (Map.Entry<String, Integer> entry : frecuencias.entrySet()) {
-                double porcentaje = total > 0 ? (entry.getValue() * 100.0 / total) : 0;
+                double porcentaje = sumaFrecuencias > 0 ? (entry.getValue() * 100.0 / sumaFrecuencias) : 0;
                 panel.modeloTabla.addRow(new Object[]{entry.getKey(), entry.getValue(), String.format("%.2f", porcentaje)});
             }
             
             panel.graficoBarras.setDatos(frecuencias, "Distribución de " + variableSeleccionada);
+            panel.graficoPastel.setDatos(frecuencias, "Distribución de " + variableSeleccionada);
         }
     }
 
