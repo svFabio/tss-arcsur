@@ -134,6 +134,9 @@ public class GestorDatos {
 
     public int getCantidadTitulados() { return datosTitulados.size(); }
     public int getCantidadEmpleadores() { return datosEmpleadores.size(); }
+
+    public ArrayList<HashMap<String, String>> getDatosTitulados() { return datosTitulados; }
+    public ArrayList<HashMap<String, String>> getDatosEmpleadores() { return datosEmpleadores; }
     private static final Set<String> COLUMNAS_EXCLUIDAS = new HashSet<>(Arrays.asList(
         // Identificadores y Contacto
         "email", "emailcontacto", "telefono", "linkedin", "contacto",
