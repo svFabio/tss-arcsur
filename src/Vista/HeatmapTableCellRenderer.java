@@ -22,15 +22,19 @@ public class HeatmapTableCellRenderer extends DefaultTableCellRenderer {
     }
 
     public void recalcularMaximo(JTable table) {
+        if (table == null) return;
         int max = 0;
         int rowCount = table.getRowCount();
         int colCount = table.getColumnCount();
 
         for (int i = 0; i < rowCount; i++) {
+            Object rowHeader = table.getValueAt(i, 0);
+            if (rowHeader != null && "TOTAL".equalsIgnoreCase(rowHeader.toString().trim())) {
+                continue;
+            }
             for (int j = 1; j < colCount; j++) {
-                // Omitir columna TOTAL si es la última
                 String colName = table.getColumnName(j);
-                if ("TOTAL".equalsIgnoreCase(colName) || j == colCount - 1) {
+                if ("TOTAL".equalsIgnoreCase(colName)) {
                     continue;
                 }
                 Object val = table.getValueAt(i, j);
@@ -54,10 +58,16 @@ public class HeatmapTableCellRenderer extends DefaultTableCellRenderer {
                                                    int row, int column) {
         Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
+        if (table == null || table.getColumnCount() == 0 || row < 0 || column < 0 ||
+                row >= table.getRowCount() || column >= table.getColumnCount()) {
+            return c;
+        }
+
         int colCount = table.getColumnCount();
         boolean esColumnaEtiqueta = (column == 0);
-        boolean esColumnaTotal = (column == colCount - 1) || "TOTAL".equalsIgnoreCase(table.getColumnName(column));
-        String rowName = String.valueOf(table.getValueAt(row, 0));
+        boolean esColumnaTotal = "TOTAL".equalsIgnoreCase(table.getColumnName(column));
+        Object rowVal = table.getValueAt(row, 0);
+        String rowName = rowVal != null ? rowVal.toString() : "";
         boolean esFilaTotal = "TOTAL".equalsIgnoreCase(rowName);
 
         // 1. Columna de Etiquetas (Nombre de Categoría Fila)
@@ -94,10 +104,10 @@ public class HeatmapTableCellRenderer extends DefaultTableCellRenderer {
         // 4. Modo Heatmap Activo: Gradiente cromático por densidad térmica
         int freq = 0;
         if (value instanceof Number) {
-            freq = ((Number) value).intValue();
+            freq = Math.max(0, ((Number) value).intValue());
         } else if (value != null) {
             try {
-                freq = Integer.parseInt(value.toString().trim());
+                freq = Math.max(0, Integer.parseInt(value.toString().trim()));
             } catch (NumberFormatException ignored) {}
         }
 
@@ -107,14 +117,13 @@ public class HeatmapTableCellRenderer extends DefaultTableCellRenderer {
             setFont(new Font("SansSerif", Font.PLAIN, 12));
             setToolTipText("Frecuencia: 0 casos");
         } else {
-            double ratio = Math.min(1.0, (double) freq / maxFrecuencia);
+            double ratio = Math.max(0.0, Math.min(1.0, (double) freq / maxFrecuencia));
 
-            // Gradiente: de azul cielo claro (224, 242, 254) a azul profundo (14, 116, 144) o (27, 79, 138)
-            int r = (int) (224 - ratio * (224 - 27));
-            int g = (int) (242 - ratio * (242 - 79));
-            int b = (int) (254 - ratio * (254 - 138));
+            int r = Math.min(255, Math.max(0, (int) (224 - ratio * (224 - 27))));
+            int g = Math.min(255, Math.max(0, (int) (242 - ratio * (242 - 79))));
+            int b = Math.min(255, Math.max(0, (int) (254 - ratio * (254 - 138))));
 
-            Color fondo = new Color(Math.max(0, r), Math.max(0, g), Math.max(0, b));
+            Color fondo = new Color(r, g, b);
             setBackground(fondo);
 
             if (ratio > 0.48) {

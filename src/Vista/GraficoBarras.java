@@ -69,14 +69,18 @@ public class GraficoBarras extends JPanel {
         int width = getWidth();
         int height = getHeight();
         int padding = 50;
-        int maxVal = 0;
 
-        for (int val : datos.values()) {
-            if (val > maxVal) maxVal = val;
+        if (width <= 2 * padding || height <= 2 * padding) {
+            return;
+        }
+
+        int maxVal = 0;
+        for (Integer val : datos.values()) {
+            if (val != null && val > maxVal) maxVal = val;
         }
         if (maxVal == 0) maxVal = 1;
 
-        int numBarras = datos.size();
+        int numBarras = Math.max(1, datos.size());
         int anchoBarra = (width - (2 * padding)) / numBarras;
         if (anchoBarra > 100) anchoBarra = 100;
         int espacio = ((width - (2 * padding)) - (anchoBarra * numBarras)) / (numBarras + 1);
@@ -108,7 +112,8 @@ public class GraficoBarras extends JPanel {
         FontMetrics fm = g2d.getFontMetrics();
 
         for (Map.Entry<String, Integer> entry : datos.entrySet()) {
-            int altoBarra = (int) (((double) entry.getValue() / maxVal) * (height - 2 * padding));
+            int val = entry.getValue() != null ? entry.getValue() : 0;
+            int altoBarra = (int) (((double) val / maxVal) * (height - 2 * padding));
             int y = height - padding - altoBarra;
 
             g2d.setColor(ConfiguracionColores.COLORES_GRAFICO[index % ConfiguracionColores.COLORES_GRAFICO.length]);
@@ -118,11 +123,11 @@ public class GraficoBarras extends JPanel {
             g2d.drawRect(x, y, anchoBarra, altoBarra);
 
             // Valor arriba de la barra
-            String valor = String.valueOf(entry.getValue());
+            String valor = String.valueOf(val);
             g2d.drawString(valor, x + (anchoBarra - fm.stringWidth(valor)) / 2, y - 5);
 
             // Etiqueta abajo (recortada si es muy larga)
-            String label = entry.getKey();
+            String label = entry.getKey() != null ? entry.getKey() : "(Sin categoría)";
             if (label.length() > 14) label = label.substring(0, 12) + "..";
             g2d.drawString(label, x + (anchoBarra - fm.stringWidth(label)) / 2, height - padding + 15);
 

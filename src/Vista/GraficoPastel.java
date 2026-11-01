@@ -89,10 +89,17 @@ public class GraficoPastel extends JPanel {
 
         // 2. Suma total
         int total = 0;
-        for (int val : datos.values()) {
-            total += val;
+        for (Integer val : datos.values()) {
+            if (val != null && val > 0) {
+                total += val;
+            }
         }
-        if (total == 0) return;
+        if (total <= 0) {
+            g2d.setColor(Color.GRAY);
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, ConfiguracionTextos.TAMANO_FUENTE_NORMAL));
+            g2d.drawString("Sin frecuencias positivas para graficar", 30, 40);
+            return;
+        }
 
         // 3. Cálculo de layout responsive
         int bottomOffset = 20;
@@ -127,7 +134,8 @@ public class GraficoPastel extends JPanel {
         int index = 0;
 
         for (Map.Entry<String, Integer> entry : datos.entrySet()) {
-            double porcion = (double) entry.getValue() / total;
+            int val = entry.getValue() != null ? Math.max(0, entry.getValue()) : 0;
+            double porcion = (double) val / total;
             double angulo = porcion * 360.0;
 
             Color color = ConfiguracionColores.COLORES_GRAFICO[index % ConfiguracionColores.COLORES_GRAFICO.length];
@@ -151,7 +159,8 @@ public class GraficoPastel extends JPanel {
 
         index = 0;
         for (Map.Entry<String, Integer> entry : datos.entrySet()) {
-            double pct = (entry.getValue() * 100.0) / total;
+            int val = entry.getValue() != null ? Math.max(0, entry.getValue()) : 0;
+            double pct = (val * 100.0) / total;
             Color color = ConfiguracionColores.COLORES_GRAFICO[index % ConfiguracionColores.COLORES_GRAFICO.length];
 
             // Cuadrito de color
@@ -161,11 +170,11 @@ public class GraficoPastel extends JPanel {
             g2d.drawRect(leyendaX, currentY - tamCaja + 2, tamCaja, tamCaja);
 
             // Texto: Categoría (recortada si es muy extensa) + Frecuencia + %
-            String etiqueta = entry.getKey();
+            String etiqueta = entry.getKey() != null ? entry.getKey() : "(Sin categoría)";
             if (etiqueta.length() > 28) {
                 etiqueta = etiqueta.substring(0, 26) + "..";
             }
-            String texto = String.format("%s: %d (%.1f%%)", etiqueta, entry.getValue(), pct);
+            String texto = String.format("%s: %d (%.1f%%)", etiqueta, val, pct);
             g2d.drawString(texto, leyendaX + tamCaja + 8, currentY + 1);
 
             currentY += fmLeyenda.getHeight() + 8;

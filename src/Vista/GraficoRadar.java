@@ -128,7 +128,7 @@ public class GraficoRadar extends JPanel {
             g2.drawLine(centroX, centroY, px, py);
 
             // Posicionamiento inteligente de texto de dimensión
-            String dim = dimensiones.get(j);
+            String dim = (j < dimensiones.size() && dimensiones.get(j) != null) ? dimensiones.get(j) : "";
             int labelDist = radio + 12;
             int lx = (int) (centroX + labelDist * Math.cos(angulo));
             int ly = (int) (centroY + labelDist * Math.sin(angulo));
@@ -187,9 +187,11 @@ public class GraficoRadar extends JPanel {
         Path2D.Double path = new Path2D.Double();
         ArrayList<Point> puntos = new ArrayList<>();
 
+        double vMax = valorMaximo > 0 ? valorMaximo : 1.0;
         for (int j = 0; j < n; j++) {
-            double val = (j < valores.size()) ? valores.get(j) : 0.0;
-            double ratio = Math.max(0.0, Math.min(1.0, val / valorMaximo));
+            Double rawVal = (j < valores.size()) ? valores.get(j) : null;
+            double val = (rawVal != null && !Double.isNaN(rawVal) && !Double.isInfinite(rawVal)) ? rawVal : 0.0;
+            double ratio = Math.max(0.0, Math.min(1.0, val / vMax));
             double angulo = -(Math.PI / 2) + (2 * Math.PI * j / n);
 
             int px = (int) (cx + (radio * ratio) * Math.cos(angulo));
