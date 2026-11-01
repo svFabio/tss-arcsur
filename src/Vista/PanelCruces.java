@@ -59,6 +59,7 @@ public class PanelCruces extends JPanel {
         tablaContingencia.setRowHeight(24);
         tablaContingencia.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
         tablaContingencia.getTableHeader().setBackground(new Color(241, 245, 249));
+        tablaContingencia.getTableHeader().setReorderingAllowed(false);
 
         heatmapRenderer = new HeatmapTableCellRenderer();
         tablaContingencia.setDefaultRenderer(Object.class, heatmapRenderer);

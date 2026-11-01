@@ -49,6 +49,14 @@ public class Controlador implements ActionListener {
         this.vista.panelDashboard.btnReporteHTML.addActionListener(e -> exportarReporteEjecutivoHTML());
         this.vista.panelDashboard.btnExportarDatosDepurados.addActionListener(e -> exportarDatosDepurados());
         this.vista.panelDashboard.btnAuditoria.addActionListener(e -> mostrarVentanaAuditoria());
+
+        // Sincronización reactiva entre pestañas
+        this.vista.pestanas.addChangeListener(e -> {
+            int selected = this.vista.pestanas.getSelectedIndex();
+            if (selected == 1 && (modelo.hayDatosTitulados() || modelo.hayDatosEmpleadores())) {
+                actualizarDashboard();
+            }
+        });
     }
 
     public void iniciar() {
@@ -113,21 +121,25 @@ public class Controlador implements ActionListener {
         int seleccion = chooser.showOpenDialog(vista);
         if (seleccion == JFileChooser.APPROVE_OPTION) {
             File archivo = chooser.getSelectedFile();
-            boolean exito = modelo.cargarCSV(archivo, esTitulados);
-            if (exito) {
-                int total = esTitulados ? modelo.getCantidadTitulados() : modelo.getCantidadEmpleadores();
-                String tipo = esTitulados ? "Titulados" : "Empleadores";
-                if (esTitulados) {
-                    vista.panelCarga.lblEstadoTitulados.setText("Titulados: " + archivo.getName() + " (" + total + " reg)");
-                } else {
-                    vista.panelCarga.lblEstadoEmpleadores.setText("Empleadores: " + archivo.getName() + " (" + total + " reg)");
-                }
-                GestorAuditoria.registrar("CARGA_CSV", "Cargados " + total + " registros de " + tipo + " desde archivo: " + archivo.getName());
-                habilitarAnalisis();
-                JOptionPane.showMessageDialog(vista, "Archivo " + archivo.getName() + " cargado correctamente.");
-            } else {
-                JOptionPane.showMessageDialog(vista, "Error al cargar el archivo. Verifique el formato CSV.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            new Thread(() -> {
+                boolean exito = modelo.cargarCSV(archivo, esTitulados);
+                SwingUtilities.invokeLater(() -> {
+                    if (exito) {
+                        int total = esTitulados ? modelo.getCantidadTitulados() : modelo.getCantidadEmpleadores();
+                        String tipo = esTitulados ? "Titulados" : "Empleadores";
+                        if (esTitulados) {
+                            vista.panelCarga.lblEstadoTitulados.setText("Titulados: " + archivo.getName() + " (" + total + " reg)");
+                        } else {
+                            vista.panelCarga.lblEstadoEmpleadores.setText("Empleadores: " + archivo.getName() + " (" + total + " reg)");
+                        }
+                        GestorAuditoria.registrar("CARGA_CSV", "Cargados " + total + " registros de " + tipo + " desde archivo: " + archivo.getName());
+                        habilitarAnalisis();
+                        JOptionPane.showMessageDialog(vista, "Archivo " + archivo.getName() + " cargado correctamente.");
+                    } else {
+                        JOptionPane.showMessageDialog(vista, "Error al cargar el archivo. Verifique el formato CSV.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         }
     }
 
@@ -197,6 +209,13 @@ public class Controlador implements ActionListener {
             }
             panel.graficoRadar.setDatos(dims, vals, "Concentracion (%)", 100.0);
             panel.graficoRadar.setTitulo("Perfil Multidimensional: " + variableSeleccionada);
+
+            // Actualizar Gráficos Cuantitativos (Histograma, Polígono, Boxplot, Ojiva)
+            ArrayList<Double> valoresNumericos = null;
+            if (Estadistica.esColumnaCuantitativa(datosColumna)) {
+                valoresNumericos = Estadistica.extraerValoresNumericos(datosColumna);
+            }
+            panel.actualizarGraficosCuantitativos(valoresNumericos, variableSeleccionada);
         }
     }
 
@@ -237,7 +256,12 @@ public class Controlador implements ActionListener {
 
                 GestorAuditoria.registrar("CALCULO_CHI", "Prueba de Chi²: [" + var1 + " x " + var2 + "]. " + resultados[3]);
             } else {
-                vista.panelCruces.lblResultadoChi.setText("Error al calcular Chi-Cuadrada");
+                this.ultimaMatrizChi = null;
+                this.ultimoResultadoChi = null;
+                vista.panelCruces.modeloTabla.setRowCount(0);
+                vista.panelCruces.modeloTabla.setColumnCount(0);
+                String msgError = (resultados != null && resultados[3] != null) ? (String) resultados[3] : "Error al calcular Chi-Cuadrada";
+                vista.panelCruces.lblResultadoChi.setText(msgError);
                 vista.panelCruces.btnExportarCSV.setEnabled(false);
             }
         } else {
@@ -256,18 +280,20 @@ public class Controlador implements ActionListener {
         int res = chooser.showSaveDialog(vista);
 
         if (res == JFileChooser.APPROVE_OPTION) {
-            File destino = chooser.getSelectedFile();
-            if (!destino.getName().toLowerCase().endsWith(".csv")) {
-                destino = new File(destino.getAbsolutePath() + ".csv");
-            }
+            File tempDest = chooser.getSelectedFile();
+            final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
 
-            boolean ok = ExportadorDatos.exportarMatrizContingenciaCSV(destino, ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
-            if (ok) {
-                GestorAuditoria.registrar("EXPORTACION_CSV", "Exportada matriz de frecuencia cruzada a: " + destino.getName());
-                JOptionPane.showMessageDialog(vista, "Matriz de frecuencias cruzadas exportada exitosamente a:\n" + destino.getAbsolutePath());
-            } else {
-                JOptionPane.showMessageDialog(vista, "Error al exportar el archivo.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            new Thread(() -> {
+                boolean ok = ExportadorDatos.exportarMatrizContingenciaCSV(destino, ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
+                SwingUtilities.invokeLater(() -> {
+                    if (ok) {
+                        GestorAuditoria.registrar("EXPORTACION_CSV", "Exportada matriz de frecuencia cruzada a: " + destino.getName());
+                        JOptionPane.showMessageDialog(vista, "Matriz de frecuencias cruzadas exportada exitosamente a:\n" + destino.getAbsolutePath());
+                    } else {
+                        JOptionPane.showMessageDialog(vista, "Error al exportar el archivo.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         }
     }
 
@@ -285,18 +311,20 @@ public class Controlador implements ActionListener {
         int res = chooser.showSaveDialog(vista);
 
         if (res == JFileChooser.APPROVE_OPTION) {
-            File destino = chooser.getSelectedFile();
-            if (!destino.getName().toLowerCase().endsWith(".csv")) {
-                destino = new File(destino.getAbsolutePath() + ".csv");
-            }
+            File tempDest = chooser.getSelectedFile();
+            final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
 
-            boolean ok = ExportadorDatos.exportarResumenUnivariadoCSV(destino, variable, panel.modeloTabla, panel.getResumenActual());
-            if (ok) {
-                GestorAuditoria.registrar("EXPORTACION_CSV", "Exportado analisis univariado de '" + variable + "' a: " + destino.getName());
-                JOptionPane.showMessageDialog(vista, "Reporte univariado exportado con exito a:\n" + destino.getAbsolutePath());
-            } else {
-                JOptionPane.showMessageDialog(vista, "Error al exportar el reporte univariado.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            new Thread(() -> {
+                boolean ok = ExportadorDatos.exportarResumenUnivariadoCSV(destino, variable, panel.modeloTabla, panel.getResumenActual());
+                SwingUtilities.invokeLater(() -> {
+                    if (ok) {
+                        GestorAuditoria.registrar("EXPORTACION_CSV", "Exportado analisis univariado de '" + variable + "' a: " + destino.getName());
+                        JOptionPane.showMessageDialog(vista, "Reporte univariado exportado con exito a:\n" + destino.getAbsolutePath());
+                    } else {
+                        JOptionPane.showMessageDialog(vista, "Error al exportar el reporte univariado.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         }
     }
 
@@ -326,17 +354,20 @@ public class Controlador implements ActionListener {
         JFileChooser chooser = new JFileChooser();
         chooser.setSelectedFile(new File(nombreSugerido));
         if (chooser.showSaveDialog(vista) == JFileChooser.APPROVE_OPTION) {
-            File destino = chooser.getSelectedFile();
-            if (!destino.getName().toLowerCase().endsWith(".csv")) {
-                destino = new File(destino.getAbsolutePath() + ".csv");
-            }
-            boolean ok = ExportadorDatos.exportarDatasetCSV(destino, cols, datos);
-            if (ok) {
-                GestorAuditoria.registrar("EXPORTACION_CSV", "Exportado dataset depurado (" + datos.size() + " registros) a: " + destino.getName());
-                JOptionPane.showMessageDialog(vista, "Dataset depurado exportado exitosamente a:\n" + destino.getAbsolutePath());
-            } else {
-                JOptionPane.showMessageDialog(vista, "Error al exportar dataset.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            File tempDest = chooser.getSelectedFile();
+            final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
+
+            new Thread(() -> {
+                boolean ok = ExportadorDatos.exportarDatasetCSV(destino, cols, datos);
+                SwingUtilities.invokeLater(() -> {
+                    if (ok) {
+                        GestorAuditoria.registrar("EXPORTACION_CSV", "Exportado dataset depurado (" + datos.size() + " registros) a: " + destino.getName());
+                        JOptionPane.showMessageDialog(vista, "Dataset depurado exportado exitosamente a:\n" + destino.getAbsolutePath());
+                    } else {
+                        JOptionPane.showMessageDialog(vista, "Error al exportar dataset.", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         }
     }
 
@@ -344,10 +375,8 @@ public class Controlador implements ActionListener {
         JFileChooser chooser = new JFileChooser();
         chooser.setSelectedFile(new File("informe_ejecutivo_arcsur.html"));
         if (chooser.showSaveDialog(vista) == JFileChooser.APPROVE_OPTION) {
-            File destino = chooser.getSelectedFile();
-            if (!destino.getName().toLowerCase().endsWith(".html")) {
-                destino = new File(destino.getAbsolutePath() + ".html");
-            }
+            File tempDest = chooser.getSelectedFile();
+            final File destino = !tempDest.getName().toLowerCase().endsWith(".html") ? new File(tempDest.getAbsolutePath() + ".html") : tempDest;
 
             Map<String, String> kpis = new LinkedHashMap<>();
             kpis.put("Muestra Titulados", String.valueOf(modelo.getCantidadTitulados()));
@@ -357,24 +386,28 @@ public class Controlador implements ActionListener {
 
             List<String> hallazgos = generarDiagnosticoEstrategico();
 
-            boolean ok = ExportadorDatos.exportarReporteEjecutivoHTML(destino, kpis, hallazgos,
-                    ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
+            new Thread(() -> {
+                boolean ok = ExportadorDatos.exportarReporteEjecutivoHTML(destino, kpis, hallazgos,
+                        ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
 
-            if (ok) {
-                GestorAuditoria.registrar("REPORTE_EJECUTIVO", "Generado y exportado informe ejecutivo HTML a: " + destino.getName());
-                int abrir = JOptionPane.showConfirmDialog(vista,
-                        "Informe Ejecutivo generado exitosamente.\n¿Desea abrirlo ahora en su navegador?",
-                        "Exportacion Completa", JOptionPane.YES_NO_OPTION);
-                if (abrir == JOptionPane.YES_OPTION) {
-                    try {
-                        Desktop.getDesktop().browse(destino.toURI());
-                    } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(vista, "Archivo guardado en: " + destino.getAbsolutePath());
+                SwingUtilities.invokeLater(() -> {
+                    if (ok) {
+                        GestorAuditoria.registrar("REPORTE_EJECUTIVO", "Generado y exportado informe ejecutivo HTML a: " + destino.getName());
+                        int abrir = JOptionPane.showConfirmDialog(vista,
+                                "Informe Ejecutivo generado exitosamente.\n¿Desea abrirlo ahora en su navegador?",
+                                "Exportacion Completa", JOptionPane.YES_NO_OPTION);
+                        if (abrir == JOptionPane.YES_OPTION) {
+                            try {
+                                Desktop.getDesktop().browse(destino.toURI());
+                            } catch (Exception ex) {
+                                JOptionPane.showMessageDialog(vista, "Archivo guardado en: " + destino.getAbsolutePath());
+                            }
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(vista, "Error al generar informe HTML.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
-                }
-            } else {
-                JOptionPane.showMessageDialog(vista, "Error al generar informe HTML.", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+                });
+            }).start();
         }
     }
 
@@ -401,9 +434,16 @@ public class Controlador implements ActionListener {
             chooser.setSelectedFile(new File("auditoria_arcsur.txt"));
             if (chooser.showSaveDialog(dlg) == JFileChooser.APPROVE_OPTION) {
                 File f = chooser.getSelectedFile();
-                if (GestorAuditoria.exportarLog(f)) {
-                    JOptionPane.showMessageDialog(dlg, "Registro de auditoria guardado con exito.");
-                }
+                new Thread(() -> {
+                    boolean ok = GestorAuditoria.exportarLog(f);
+                    SwingUtilities.invokeLater(() -> {
+                        if (ok) {
+                            JOptionPane.showMessageDialog(dlg, "Registro de auditoria guardado con exito.");
+                        } else {
+                            JOptionPane.showMessageDialog(dlg, "Error al guardar el log de auditoria.", "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    });
+                }).start();
             }
         });
 
@@ -425,7 +465,7 @@ public class Controlador implements ActionListener {
 
         vista.panelDashboard.actualizarKPIs(cantTit, cantEmp, tasaInsercion, interesPosgrado);
 
-        // Alimentar Radar Comparativo de Áreas/Competencias
+        // Alimentar Radar Comparativo de Áreas/Competencias con ejes alineados
         ArrayList<String> competencias = new ArrayList<>(Arrays.asList(
                 "Ing. Software", "Ciencia de Datos", "Ciberseguridad", "Gestion Proyectos", "Hab. Blandas"
         ));
@@ -433,24 +473,29 @@ public class Controlador implements ActionListener {
         ArrayList<Double> valoresEmp = new ArrayList<>();
 
         if (cantTit > 0) {
-            // Estimar puntajes relativos según datos reales
-            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Ciencia de Datos", 75.0));
-            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Ciberseguridad", 68.0));
-            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Desarrollo de Software", 88.0));
-            valoresTit.add(calcularPorcentajeCoincidencia(true, "PertinenciaLaboral", "Muy Buena", 72.0));
-            valoresTit.add(70.0);
-        } else {
-            valoresTit.addAll(Arrays.asList(80.0, 70.0, 85.0, 65.0, 75.0));
+            // Eje 0: "Ing. Software"
+            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Software", 88.0));
+            // Eje 1: "Ciencia de Datos"
+            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Datos", 75.0));
+            // Eje 2: "Ciberseguridad"
+            valoresTit.add(calcularPorcentajeCoincidencia(true, "AreaInteres", "Seguridad", 68.0));
+            // Eje 3: "Gestion Proyectos"
+            valoresTit.add(calcularPorcentajeCoincidencia(true, "PertinenciaLaboral", "acuerdo", 72.0));
+            // Eje 4: "Hab. Blandas"
+            valoresTit.add(calcularPorcentajeCoincidencia(true, "ConcordanciaMercado", "acuerdo", 70.0));
         }
 
         if (cantEmp > 0) {
+            // Eje 0: "Ing. Software"
             valoresEmp.add(calcularPorcentajeCoincidencia(false, "AreasEmergentes", "Software", 85.0));
+            // Eje 1: "Ciencia de Datos"
             valoresEmp.add(calcularPorcentajeCoincidencia(false, "AreasEmergentes", "Datos", 82.0));
+            // Eje 2: "Ciberseguridad"
             valoresEmp.add(calcularPorcentajeCoincidencia(false, "AreasEmergentes", "Seguridad", 78.0));
+            // Eje 3: "Gestion Proyectos"
             valoresEmp.add(calcularPorcentajeCoincidencia(false, "HabilidadesBlandas", "Proyectos", 80.0));
-            valoresEmp.add(85.0);
-        } else {
-            valoresEmp.addAll(Arrays.asList(85.0, 82.0, 80.0, 78.0, 88.0));
+            // Eje 4: "Hab. Blandas"
+            valoresEmp.add(calcularPorcentajeCoincidencia(false, "CompetenciasLaborales", "acuerdo", 85.0));
         }
 
         vista.panelDashboard.graficoRadar.setDatosComparativos(
@@ -464,39 +509,19 @@ public class Controlador implements ActionListener {
         vista.panelDashboard.actualizarTextoDiagnostico(diagnostico);
     }
 
-    private double calcularTasaInsercion() {
-        if (!modelo.hayDatosTitulados()) return 0.0;
-        ArrayList<String> situaciones = modelo.obtenerColumna(true, "SituacionLaboral");
-        if (situaciones.isEmpty()) return 85.0; // valor referencial si la columna usa otro nombre
-
-        int ocupados = 0;
-        for (String s : situaciones) {
-            String val = s.toLowerCase();
-            if (val.contains("organizaci") || val.contains("empresa") || val.contains("emprend") || val.contains("trabaj")) {
-                ocupados++;
-            }
-        }
-        return (ocupados * 100.0) / situaciones.size();
+    public double calcularTasaInsercion() {
+        return modelo.calcularTasaInsercion();
     }
 
-    private String calcularTasaInsercionString() {
+    public String calcularTasaInsercionString() {
         return String.format("%.1f%%", calcularTasaInsercion());
     }
 
-    private double calcularInteresPosgrado() {
-        if (!modelo.hayDatosTitulados()) return 0.0;
-        ArrayList<String> interes = modelo.obtenerColumna(true, "InteresPosgrado");
-        if (interes.isEmpty()) interes = modelo.obtenerColumna(true, "RealizoPosgrado");
-        if (interes.isEmpty()) return 70.0;
-
-        int si = 0;
-        for (String s : interes) {
-            if ("si".equalsIgnoreCase(s.trim())) si++;
-        }
-        return (si * 100.0) / interes.size();
+    public double calcularInteresPosgrado() {
+        return modelo.calcularInteresPosgrado();
     }
 
-    private String calcularInteresPosgradoString() {
+    public String calcularInteresPosgradoString() {
         return String.format("%.1f%%", calcularInteresPosgrado());
     }
 

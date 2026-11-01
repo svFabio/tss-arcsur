@@ -253,6 +253,7 @@ public class PanelEncuestaEmpleadores extends JPanel {
                     btnEnviar.setEnabled(true);
                     btnEnviar.setText("Registrar Respuesta de Empleador");
                     if (exito) {
+                        Modelo.GestorAuditoria.registrar("REGISTRO_ENCUESTA_EMPLEADOR", "Encuesta de empleador registrada en la nube: " + datos.get("NombreEmpresa"), "PanelEmpleadores");
                         JOptionPane.showMessageDialog(this,
                                 "¡Respuesta registrada exitosamente en Supabase!\nGracias por aportar con la visión del sector empleador.",
                                 "Registro Exitoso",
@@ -277,18 +278,37 @@ public class PanelEncuestaEmpleadores extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
-    private java.util.Map<String, String> recolectarDatos() {
+    public java.util.Map<String, String> recolectarDatos() {
         java.util.Map<String, String> m = new java.util.HashMap<>();
-        m.put("correo", txtCorreo.getText().trim());
-        m.put("nombre_empresa", txtNombreEmpresa.getText().trim());
-        m.put("tipo_organizacion", comboTipoOrganizacion.getSelectedIndex() > 0 ? (String) comboTipoOrganizacion.getSelectedItem() : "");
-        m.put("tamanio", comboTamanio.getSelectedIndex() > 0 ? (String) comboTamanio.getSelectedItem() : "");
-        m.put("rubro", comboRubro.getSelectedIndex() > 0 ? (String) comboRubro.getSelectedItem() : "");
+        String correo = txtCorreo.getText().trim();
+        String empresa = txtNombreEmpresa.getText().trim();
+        String tipoOrg = comboTipoOrganizacion.getSelectedIndex() > 0 ? (String) comboTipoOrganizacion.getSelectedItem() : "";
+        String tamanio = comboTamanio.getSelectedIndex() > 0 ? (String) comboTamanio.getSelectedItem() : "";
+        String rubro = comboRubro.getSelectedIndex() > 0 ? (String) comboRubro.getSelectedItem() : "";
+        String contrato = rbContratoSi.isSelected() ? "SI" : (rbContratoNo.isSelected() ? "NO" : "");
+        String proy = comboProyeccionContratacion.getSelectedIndex() > 0 ? (String) comboProyeccionContratacion.getSelectedItem() : "";
+        String nivel = comboNivelAcademicoDemandado.getSelectedIndex() > 0 ? (String) comboNivelAcademicoDemandado.getSelectedItem() : "";
+        String medio = comboMedioConvocatoria.getSelectedIndex() > 0 ? (String) comboMedioConvocatoria.getSelectedItem() : "";
 
-        m.put("contrato_titulados", rbContratoSi.isSelected() ? "SI" : (rbContratoNo.isSelected() ? "NO" : ""));
-        m.put("proyeccion_contratacion", comboProyeccionContratacion.getSelectedIndex() > 0 ? (String) comboProyeccionContratacion.getSelectedItem() : "");
-        m.put("nivel_academico_demandado", comboNivelAcademicoDemandado.getSelectedIndex() > 0 ? (String) comboNivelAcademicoDemandado.getSelectedItem() : "");
-        m.put("medio_convocatoria", comboMedioConvocatoria.getSelectedIndex() > 0 ? (String) comboMedioConvocatoria.getSelectedItem() : "");
+        m.put("correo", correo);
+        m.put("EmailContacto", correo);
+        m.put("nombre_empresa", empresa);
+        m.put("NombreEmpresa", empresa);
+        m.put("tipo_organizacion", tipoOrg);
+        m.put("TipoOrganizacion", tipoOrg);
+        m.put("tamanio", tamanio);
+        m.put("Tamanio", tamanio);
+        m.put("rubro", rubro);
+        m.put("Rubro", rubro);
+
+        m.put("contrato_titulados", contrato);
+        m.put("ContratoSistemas", contrato);
+        m.put("proyeccion_contratacion", proy);
+        m.put("ProyeccionContratacion", proy);
+        m.put("nivel_academico_demandado", nivel);
+        m.put("NivelAcademicoDemandado", nivel);
+        m.put("medio_convocatoria", medio);
+        m.put("MedioConvocatoria", medio);
 
         StringBuilder sbCargos = new StringBuilder();
         for (JCheckBox cb : chkCargos) {
@@ -298,16 +318,37 @@ public class PanelEncuestaEmpleadores extends JPanel {
             }
         }
         m.put("cargos_desempenados", sbCargos.toString());
+        m.put("CargosDesempenados", sbCargos.toString());
 
-        m.put("areas_emergentes", txtAreasEmergentes.getText().trim());
-        m.put("herramientas_tecnologicas", txtHerramientasTecnologicas.getText().trim());
-        m.put("habilidades_fundamentales", txtHabilidadesFundamentales.getText().trim());
+        String areasEmerg = txtAreasEmergentes.getText().trim();
+        String herramientas = txtHerramientasTecnologicas.getText().trim();
+        String habilidades = txtHabilidadesFundamentales.getText().trim();
+
+        m.put("areas_emergentes", areasEmerg);
+        m.put("AreasEmergentes", areasEmerg);
+        m.put("herramientas_tecnologicas", herramientas);
+        m.put("HerramientasTecnologicas", herramientas);
+        m.put("habilidades_fundamentales", habilidades);
+        m.put("HabilidadesBlandas", habilidades);
+
+        // 18 Columnas Likert canónicas (Tabla 4 y empleadores_limpio.csv)
+        String[] columnasLikertEmp = {
+            "ConfianzaFormadora", "TituloConsistente", "ConsultaEmpleadores", "ConocePerfil",
+            "PerfilCoherente", "DesempenoIntegral", "ConsideraPasantias", "CompetenciasLaborales",
+            "ValoresEticos", "ProcesosEvaluacion", "VinculosOportunidades", "VinculacionTecnologica",
+            "DifusionPasantias", "IntercambioConocimientos", "RetroalimentaPlanEstudios", "PertinenciaFormacion",
+            "BusquedaTalentoUMSS", "AutoevaluacionPeriodica"
+        };
 
         StringBuilder sbLikert = new StringBuilder();
         for (int i = 0; i < combosLikert.size(); i++) {
             JComboBox<String> cmb = combosLikert.get(i);
+            String val = cmb.getSelectedIndex() > 0 ? (String) cmb.getSelectedItem() : "";
+            if (i < columnasLikertEmp.length) {
+                m.put(columnasLikertEmp[i], val);
+            }
             if (i > 0) sbLikert.append("; ");
-            sbLikert.append("Crit ").append(i + 1).append(": ").append(cmb.getSelectedItem());
+            sbLikert.append("Crit ").append(i + 1).append(": ").append(val);
         }
         m.put("criterios_likert", sbLikert.toString());
 

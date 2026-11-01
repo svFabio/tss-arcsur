@@ -600,6 +600,8 @@ public class PanelEncuestaTitulados extends JPanel {
                     btnEnviar.setEnabled(true);
                     btnEnviar.setText("Registrar Respuesta de Titulado");
                     if (exito) {
+                        String emailRegistrado = datos.getOrDefault("EmailContacto", datos.getOrDefault("email", "titulado"));
+                        Modelo.GestorAuditoria.registrar("REGISTRO_ENCUESTA_TITULADO", "Encuesta de titulado registrada en la nube: " + emailRegistrado, "PanelTitulados");
                         JOptionPane.showMessageDialog(this,
                                 "¡Respuesta registrada exitosamente en Supabase!\nGracias por aportar a la acreditación de la Carrera.",
                                 "Registro Exitoso",
@@ -828,9 +830,17 @@ public class PanelEncuestaTitulados extends JPanel {
 
         boolean tieneRed = rbRedContactosSi.isSelected();
         m.put("red_contactos", tieneRed ? "SI" : (rbRedContactosNo.isSelected() ? "NO" : ""));
-        m.put("email", tieneRed ? txtEmail.getText().trim() : "");
-        m.put("telefono", tieneRed ? txtTelefono.getText().trim() : "");
-        m.put("linkedin", tieneRed ? txtLinkedin.getText().trim() : "");
+        m.put("RedContactos", tieneRed ? "SI" : (rbRedContactosNo.isSelected() ? "NO" : ""));
+        String email = tieneRed ? txtEmail.getText().trim() : "";
+        m.put("email", email);
+        m.put("Email", email);
+        m.put("EmailContacto", email);
+        String tel = tieneRed ? txtTelefono.getText().trim() : "";
+        m.put("telefono", tel);
+        m.put("Telefono", tel);
+        String linkedin = tieneRed ? txtLinkedin.getText().trim() : "";
+        m.put("linkedin", linkedin);
+        m.put("LinkedIn", linkedin);
 
         return m;
     }

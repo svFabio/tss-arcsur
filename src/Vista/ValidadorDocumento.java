@@ -106,14 +106,14 @@ public class ValidadorDocumento extends PlainDocument {
                 return esLetraEspanol(c) || c == ' ';
 
             case TELEFONO:
-                // Permite dígitos, espacios, guiones y '+' solo al inicio
-                return (c >= '0' && c <= '9') || c == ' ' || c == '-' || (c == '+' && pos == 0);
+                // Permite dígitos, espacios, guiones y '+' solo al inicio cuando el documento está vacío
+                return (c >= '0' && c <= '9') || c == ' ' || c == '-' || (c == '+' && pos == 0 && getLength() == 0);
 
             case ALFANUMERICO:
                 // Letras (con tildes/ñ), números, espacios y puntuación empresarial usual
                 return esLetraEspanol(c) || (c >= '0' && c <= '9') || c == ' '
                         || c == '.' || c == ',' || c == '-' || c == '/' || c == '&'
-                        || c == '(' || c == ')' || c == '\'' || c == '"';
+                        || c == '(' || c == ')' || c == '\'' || c == '"' || c == '\u00BF' || c == '\u00A1';
 
             case EMAIL:
                 // Letras ASCII, números y símbolos permitidos en emails
@@ -129,10 +129,10 @@ public class ValidadorDocumento extends PlainDocument {
                         || c == '?' || c == '=' || c == '&' || c == '%' || c == '#';
 
             case TEXTO_LIBRE:
-                // Para áreas de texto: letras (tildes/ñ), números, saltos y signos comunes
+                // Para áreas de texto: letras (tildes/ñ), números, saltos y signos comunes (incluyendo ¿ y ¡)
                 if (c == '\n' || c == '\r' || c == '\t' || c == ' ') return true;
                 if (esLetraEspanol(c) || (c >= '0' && c <= '9')) return true;
-                String puntuacion = ".,;:!?()[]{}-_\"'/+#%*$&";
+                String puntuacion = ".,;:!?\u00BF\u00A1()[]{}-_\"'/+#%*$&";
                 return puntuacion.indexOf(c) >= 0;
 
             default:
