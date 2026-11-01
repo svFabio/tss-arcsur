@@ -7,6 +7,7 @@ import java.util.Random;
 public class DatosEjemplo {
 
     public static void cargarDatos(GestorDatos gestor) {
+        if (gestor == null) return;
         Random r = new Random();
 
         // 1. Datos de Titulados con bifurcaciones realistas

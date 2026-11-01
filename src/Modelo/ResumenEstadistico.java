@@ -1,5 +1,7 @@
 package Modelo;
 
+import java.util.Locale;
+
 /**
  * DTO (Data Transfer Object) que encapsula los resultados de estadísticas
  * descriptivas univariadas para cualquier tipo de variable:
@@ -51,10 +53,10 @@ public class ResumenEstadistico {
      */
     public ResumenEstadistico(double media, double mediana, double desviacion,
                               double min, double max, int n) {
-        this("Media (x̄)",                String.format("%.2f", media),
-             "Mediana (Me)",               String.format("%.2f", mediana),
-             "Desv. Estándar (s)",         "±" + String.format("%.2f", desviacion),
-             "Rango [Mín - Máx]",          String.format("%.2f", min) + " - " + String.format("%.2f", max),
+        this("Media (x̄)",                String.format(Locale.US, "%.2f", media),
+             "Mediana (Me)",               String.format(Locale.US, "%.2f", mediana),
+             "Desv. Estándar (s)",         "±" + String.format(Locale.US, "%.2f", desviacion),
+             "Rango [Mín - Máx]",          String.format(Locale.US, "%.2f - %.2f", min, max),
              "Muestra Válida (N)",          String.valueOf(n),
              media, mediana, desviacion, min, max, n);
     }
@@ -64,10 +66,10 @@ public class ResumenEstadistico {
     public static ResumenEstadistico crearCuantitativo(double med, double mdn, double desv,
                                                       double min, double max, int n) {
         return new ResumenEstadistico(
-                "Media (x̄)",                String.format("%.2f", med),
-                "Mediana (Me)",               String.format("%.2f", mdn),
-                "Desv. Estándar (s)",         "±" + String.format("%.2f", desv),
-                "Rango [Mín - Máx]",          String.format("%.2f", min) + " - " + String.format("%.2f", max),
+                "Media (x̄)",                String.format(Locale.US, "%.2f", med),
+                "Mediana (Me)",               String.format(Locale.US, "%.2f", mdn),
+                "Desv. Estándar (s)",         "±" + String.format(Locale.US, "%.2f", desv),
+                "Rango [Mín - Máx]",          String.format(Locale.US, "%.2f - %.2f", min, max),
                 "Muestra Válida (N)",          String.valueOf(n),
                 med, mdn, desv, min, max, n
         );
@@ -75,12 +77,12 @@ public class ResumenEstadistico {
 
     public static ResumenEstadistico crearLikert(double med, double mdn, double desv,
                                                 double min, double max, int n, double escalaMax) {
-        String mediaStr = String.format("%.2f / %.0f", med, escalaMax);
+        String mediaStr = String.format(Locale.US, "%.2f / %.0f", med, escalaMax);
         return new ResumenEstadistico(
                 "Puntaje Medio (x̄)",          mediaStr,
-                "Mediana (Me)",               String.format("%.2f", mdn),
-                "Desv. Estándar (s)",         "±" + String.format("%.2f", desv),
-                "Rango [Mín - Máx]",          String.format("%.0f - %.0f", min, max),
+                "Mediana (Me)",               String.format(Locale.US, "%.2f", mdn),
+                "Desv. Estándar (s)",         "±" + String.format(Locale.US, "%.2f", desv),
+                "Rango [Mín - Máx]",          String.format(Locale.US, "%.0f - %.0f", min, max),
                 "Muestra Válida (N)",          String.valueOf(n),
                 med, mdn, desv, min, max, n
         );
@@ -93,11 +95,12 @@ public class ResumenEstadistico {
         int countMayor = Math.max(countA, countB);
         double propMayor = n > 0 ? ((double) countMayor / n) : 0.0;
         double p = n > 0 ? ((double) countA / n) : 0.0;
-        double desvBinomial = Math.sqrt(p * (1.0 - p));
+        double pClamped = Math.max(0.0, Math.min(1.0, p));
+        double desvBinomial = Math.sqrt(pClamped * (1.0 - pClamped));
 
-        String val1 = String.format("%.1f%% %s", propMayor * 100.0, mayoritaria);
+        String val1 = String.format(Locale.US, "%.1f%% %s", propMayor * 100.0, mayoritaria);
         String val2 = mayoritaria;
-        String val3 = "±" + String.format("%.2f", desvBinomial);
+        String val3 = "±" + String.format(Locale.US, "%.2f", desvBinomial);
         String val4 = catA + " / " + catB;
         String val5 = String.valueOf(n);
 
@@ -107,7 +110,7 @@ public class ResumenEstadistico {
                 "Desv. Binomial",              val3,
                 "Categorías",                  val4,
                 "Muestra Válida (N)",          val5,
-                p, (countA >= countB ? 1.0 : 0.0), desvBinomial, 0.0, 1.0, n
+                pClamped, (countA >= countB ? 1.0 : 0.0), desvBinomial, 0.0, 1.0, n
         );
     }
 
@@ -118,9 +121,9 @@ public class ResumenEstadistico {
         double pct1 = n > 0 ? (top1Count * 100.0 / n) : 0;
         double pct2 = n > 0 ? (top2Count * 100.0 / n) : 0;
 
-        String val1 = top1Nombre + String.format(" (%.1f%%)", pct1);
+        String val1 = top1Nombre + String.format(Locale.US, " (%.1f%%)", pct1);
         String val2 = (top2Nombre != null && !top2Nombre.isEmpty()) ?
-                top2Nombre + String.format(" (%.1f%%)", pct2) : "N/A";
+                top2Nombre + String.format(Locale.US, " (%.1f%%)", pct2) : "N/A";
         String val3 = totalCategorias + " categorías";
         String val4 = minFrec + " - " + maxFrec + " resp.";
         String val5 = String.valueOf(n);
@@ -149,15 +152,23 @@ public class ResumenEstadistico {
         return valor3;
     }
 
-    public String getMinStr() {
-        return String.format("%.2f", min);
-    }
-
-    public String getMaxStr() {
-        return String.format("%.2f", max);
+    public String getRangoStr() {
+        return valor4;
     }
 
     public String getNStr() {
         return valor5;
+    }
+
+    public boolean esVariableCuantitativa() {
+        return titulo1.startsWith("Media") || titulo1.startsWith("Puntaje");
+    }
+
+    public boolean esVariableBinaria() {
+        return titulo1.startsWith("Tasa");
+    }
+
+    public boolean esVariableNominal() {
+        return titulo1.startsWith("Moda");
     }
 }

@@ -1,13 +1,12 @@
 package Modelo;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Locale;
 
 public class ChiCuadrada {
 
     public static Object[] calcularChiCuadrada(ArrayList<String> var1, ArrayList<String> var2) {
-        if (var1.size() != var2.size() || var1.isEmpty()) {
+        if (var1 == null || var2 == null || var1.size() != var2.size() || var1.isEmpty()) {
             return new Object[]{null, 0.0, 0, "Error en datos"};
         }
 
@@ -18,6 +17,10 @@ public class ChiCuadrada {
         // 2. Crear y llenar tabla de contingencia (Frecuencias Observadas)
         int filas = unicosV1.size();
         int cols = unicosV2.size();
+        if (filas == 0 || cols == 0) {
+            return new Object[]{null, 0.0, 0, "Sin datos válidos"};
+        }
+
         int[][] observadas = new int[filas][cols];
         int[] totalesFila = new int[filas];
         int[] totalesCol = new int[cols];
@@ -26,10 +29,14 @@ public class ChiCuadrada {
         for (int i = 0; i < var1.size(); i++) {
             String v1 = var1.get(i);
             String v2 = var2.get(i);
-            if (v1.isEmpty() || v2.isEmpty()) continue;
+            if (v1 == null || v2 == null) continue;
+            String v1Clean = v1.trim();
+            String v2Clean = v2.trim();
+            if (v1Clean.isEmpty() || v2Clean.isEmpty()) continue;
 
-            int filaIdx = unicosV1.indexOf(v1);
-            int colIdx = unicosV2.indexOf(v2);
+            int filaIdx = unicosV1.indexOf(v1Clean);
+            int colIdx = unicosV2.indexOf(v2Clean);
+            if (filaIdx < 0 || colIdx < 0) continue;
 
             observadas[filaIdx][colIdx]++;
             totalesFila[filaIdx]++;
@@ -42,10 +49,14 @@ public class ChiCuadrada {
         // 3. Calcular frecuencias esperadas y Chi-Cuadrada
         double chiCuadrada = 0;
         double[][] esperadas = new double[filas][cols];
+        int celdasEsperadasMenor5 = 0;
 
         for (int i = 0; i < filas; i++) {
             for (int j = 0; j < cols; j++) {
                 esperadas[i][j] = (double) (totalesFila[i] * totalesCol[j]) / totalGeneral;
+                if (esperadas[i][j] < 5.0) {
+                    celdasEsperadasMenor5++;
+                }
                 if (esperadas[i][j] > 0) {
                     double diferencia = observadas[i][j] - esperadas[i][j];
                     chiCuadrada += (diferencia * diferencia) / esperadas[i][j];
@@ -54,9 +65,9 @@ public class ChiCuadrada {
         }
 
         int gradosLibertad = (filas - 1) * (cols - 1);
-        
-        // Empaquetar matriz para la vista
-        Object[][] matrizResultados = new Object[filas + 1][cols + 2];
+
+        // Empaquetar matriz para la vista con totales marginales completos (filas + 2)
+        Object[][] matrizResultados = new Object[filas + 2][cols + 2];
         matrizResultados[0][0] = "Variables";
         for (int j = 0; j < cols; j++) matrizResultados[0][j + 1] = unicosV2.get(j);
         matrizResultados[0][cols + 1] = "TOTAL";
@@ -69,12 +80,26 @@ public class ChiCuadrada {
             matrizResultados[i + 1][cols + 1] = totalesFila[i];
         }
 
+        // Fila final de totales marginales de columna
+        matrizResultados[filas + 1][0] = "TOTAL";
+        for (int j = 0; j < cols; j++) {
+            matrizResultados[filas + 1][j + 1] = totalesCol[j];
+        }
+        matrizResultados[filas + 1][cols + 1] = totalGeneral;
+
         int minDim = Math.min(filas - 1, cols - 1);
         double cramerV = (totalGeneral > 0 && minDim > 0) ? Math.sqrt(chiCuadrada / ((double) totalGeneral * minDim)) : 0.0;
 
-        String conclusion = gradosLibertad > 0 ? "Valor Chi²: " + String.format("%.2f", chiCuadrada) + 
-                            " (GL: " + gradosLibertad + ") | V de Cramér: " + String.format("%.3f", cramerV) + 
-                            " (" + interpretarCramer(cramerV) + ")" : "Datos insuficientes para Chi²";
+        String conclusion;
+        if (gradosLibertad > 0) {
+            conclusion = String.format(Locale.US, "Valor Chi²: %.2f (GL: %d) | V de Cramér: %.3f (%s)",
+                    chiCuadrada, gradosLibertad, cramerV, interpretarCramer(cramerV));
+            if ((double) celdasEsperadasMenor5 / (filas * cols) > 0.20) {
+                conclusion += " | Advertencia (Regla de Cochran): >20% celdas con frecuencia esperada < 5";
+            }
+        } else {
+            conclusion = "Datos insuficientes para Chi²";
+        }
 
         return new Object[]{matrizResultados, chiCuadrada, gradosLibertad, conclusion};
     }
@@ -88,9 +113,13 @@ public class ChiCuadrada {
 
     private static ArrayList<String> obtenerUnicos(ArrayList<String> lista) {
         ArrayList<String> unicos = new ArrayList<>();
+        if (lista == null) return unicos;
         for (String item : lista) {
-            if (!item.isEmpty() && !unicos.contains(item)) {
-                unicos.add(item);
+            if (item != null) {
+                String clean = item.trim();
+                if (!clean.isEmpty() && !unicos.contains(clean)) {
+                    unicos.add(clean);
+                }
             }
         }
         return unicos;

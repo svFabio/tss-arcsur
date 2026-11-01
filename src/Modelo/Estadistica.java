@@ -8,14 +8,26 @@ public class Estadistica {
 
     public static double media(ArrayList<Double> datos) {
         if (datos == null || datos.isEmpty()) return 0.0;
-        double suma = 0;
-        for (double d : datos) suma += d;
-        return suma / datos.size();
+        double m = 0;
+        int count = 0;
+        for (Double d : datos) {
+            if (d != null && !Double.isNaN(d) && !Double.isInfinite(d)) {
+                count++;
+                m += (d - m) / count;
+            }
+        }
+        return count > 0 ? m : 0.0;
     }
 
     public static double mediana(ArrayList<Double> datos) {
         if (datos == null || datos.isEmpty()) return 0.0;
-        ArrayList<Double> copia = new ArrayList<>(datos);
+        ArrayList<Double> copia = new ArrayList<>();
+        for (Double d : datos) {
+            if (d != null && !Double.isNaN(d) && !Double.isInfinite(d)) {
+                copia.add(d);
+            }
+        }
+        if (copia.isEmpty()) return 0.0;
         Collections.sort(copia);
         int n = copia.size();
         if (n % 2 == 0) {
@@ -25,14 +37,172 @@ public class Estadistica {
     }
 
     public static double desviacionEstandar(ArrayList<Double> datos) {
-        if (datos == null || datos.size() < 2) return 0.0;
-        double m = media(datos);
+        return Math.sqrt(varianza(datos));
+    }
+
+    public static double varianza(ArrayList<Double> datos) {
+        if (datos == null || datos.isEmpty()) return 0.0;
+        ArrayList<Double> validos = new ArrayList<>();
+        for (Double d : datos) {
+            if (d != null && !Double.isNaN(d) && !Double.isInfinite(d)) {
+                validos.add(d);
+            }
+        }
+        if (validos.size() < 2) return 0.0;
+        double m = media(validos);
         double suma = 0;
-        for (double d : datos) {
+        for (Double d : validos) {
             suma += (d - m) * (d - m);
         }
-        // Desviación MUESTRAL: divide por N-1 (corrección de Bessel)
-        return Math.sqrt(suma / (datos.size() - 1));
+        return suma / (validos.size() - 1); // corrección de Bessel
+    }
+
+    public static double coeficienteVariacion(ArrayList<Double> datos) {
+        double m = media(datos);
+        if (m == 0) return 0.0;
+        return (desviacionEstandar(datos) / Math.abs(m)) * 100.0;
+    }
+
+    public static Double moda(ArrayList<Double> datos) {
+        if (datos == null || datos.isEmpty()) return null;
+        Map<Double, Integer> conteo = new LinkedHashMap<>();
+        for (Double d : datos) {
+            if (d == null || Double.isNaN(d) || Double.isInfinite(d)) continue;
+            conteo.put(d, conteo.getOrDefault(d, 0) + 1);
+        }
+        if (conteo.isEmpty()) return null;
+        Double moda = null;
+        int maxFrec = -1;
+        for (Map.Entry<Double, Integer> entry : conteo.entrySet()) {
+            if (entry.getValue() > maxFrec) {
+                maxFrec = entry.getValue();
+                moda = entry.getKey();
+            }
+        }
+        return moda;
+    }
+
+    public static double percentil(ArrayList<Double> datos, double p) {
+        if (datos == null || datos.isEmpty()) return 0.0;
+        ArrayList<Double> copia = new ArrayList<>();
+        for (Double d : datos) {
+            if (d != null && !Double.isNaN(d) && !Double.isInfinite(d)) {
+                copia.add(d);
+            }
+        }
+        if (copia.isEmpty()) return 0.0;
+        Collections.sort(copia);
+        int n = copia.size();
+        if (n == 1) return copia.get(0);
+        double pos = p * (n - 1);
+        if (pos <= 0) return copia.get(0);
+        if (pos >= n - 1) return copia.get(n - 1);
+        int lo = (int) Math.floor(pos);
+        int hi = (int) Math.ceil(pos);
+        if (lo == hi) return copia.get(lo);
+        double frac = pos - lo;
+        return copia.get(lo) + frac * (copia.get(hi) - copia.get(lo));
+    }
+
+    public static double[] cuartiles(ArrayList<Double> datos) {
+        return new double[] {
+            percentil(datos, 0.25),
+            percentil(datos, 0.50),
+            percentil(datos, 0.75)
+        };
+    }
+
+    public static double rangoIntercuartil(ArrayList<Double> datos) {
+        double[] q = cuartiles(datos);
+        return q[2] - q[0];
+    }
+
+    public static double[] limitesTukey(ArrayList<Double> datos) {
+        double[] q = cuartiles(datos);
+        double riq = q[2] - q[0];
+        double li = q[0] - 1.5 * riq;
+        double ls = q[2] + 1.5 * riq;
+        return new double[] { li, ls };
+    }
+
+    public static ArrayList<Double> obtenerAtipicos(ArrayList<Double> datos) {
+        ArrayList<Double> atipicos = new ArrayList<>();
+        if (datos == null || datos.isEmpty()) return atipicos;
+        double[] limites = limitesTukey(datos);
+        double li = limites[0];
+        double ls = limites[1];
+        for (Double d : datos) {
+            if (d != null && (d < li || d > ls)) {
+                atipicos.add(d);
+            }
+        }
+        return atipicos;
+    }
+
+    /**
+     * Construye la tabla de frecuencias continuas agrupadas en clases de amplitud constante
+     * (conforme a la regla de Sturges simplificada a 6 clases de la Tabla 1 del informe ARCUSUR).
+     * Retorna columnas: [Intervalo, Marca de clase, fi, hi (%), Fi, Fi (%)]
+     */
+    public static Object[][] generarTablaFrecuenciasIntervalos(ArrayList<Double> datos, int numClases) {
+        if (datos == null || datos.isEmpty() || numClases <= 0) {
+            return new Object[0][0];
+        }
+
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        int n = 0;
+        for (Double d : datos) {
+            if (d == null || Double.isNaN(d) || Double.isInfinite(d)) continue;
+            if (d < min) min = d;
+            if (d > max) max = d;
+            n++;
+        }
+
+        if (n == 0 || min > max) {
+            return new Object[0][0];
+        }
+
+        double rango = max - min;
+        if (rango == 0) {
+            min -= 0.5;
+            max += 0.5;
+            rango = 1.0;
+        }
+
+        double amplitud = rango / numClases;
+        int[] fi = new int[numClases];
+
+        for (Double d : datos) {
+            if (d == null || Double.isNaN(d) || Double.isInfinite(d)) continue;
+            int idx = (int) Math.floor((d - min) / amplitud);
+            if (idx >= numClases) idx = numClases - 1;
+            if (idx < 0) idx = 0;
+            fi[idx]++;
+        }
+
+        Object[][] tabla = new Object[numClases][6];
+        int acumulado = 0;
+
+        for (int i = 0; i < numClases; i++) {
+            double limInf = min + i * amplitud;
+            double limSup = min + (i + 1) * amplitud;
+            double marcaClase = (limInf + limSup) / 2.0;
+
+            acumulado += fi[i];
+            double hi = (fi[i] * 100.0) / n;
+            double fiPct = (acumulado * 100.0) / n;
+
+            String intervalo = String.format(Locale.US, "%s%.1f – %.1f]", (i == 0 ? "[" : "("), limInf, limSup);
+            tabla[i][0] = intervalo;
+            tabla[i][1] = String.format(Locale.US, "%.2f", marcaClase);
+            tabla[i][2] = fi[i];
+            tabla[i][3] = String.format(Locale.US, "%.1f%%", hi);
+            tabla[i][4] = acumulado;
+            tabla[i][5] = String.format(Locale.US, "%.1f%%", fiPct);
+        }
+
+        return tabla;
     }
 
     // ── Métodos cuantitativos y escalas Likert (HU1 y HU4) ──────────────────
@@ -71,7 +241,12 @@ public class Estadistica {
 
         // 1. Parseo directo de número
         try {
-            return Double.parseDouble(trim.replace(",", "."));
+            if (!trim.equalsIgnoreCase("nan") && !trim.toLowerCase().contains("infinity")) {
+                double parsed = Double.parseDouble(trim.replace(",", "."));
+                if (!Double.isNaN(parsed) && !Double.isInfinite(parsed)) {
+                    return parsed;
+                }
+            }
         } catch (NumberFormatException ignored) {}
 
         String lower = trim.toLowerCase();
@@ -81,6 +256,9 @@ public class Estadistica {
         if (likert != null) return likert;
 
         // 3. Rangos salariales (Bs.)
+        if (lower.contains("menor") && (lower.contains("2500") || lower.contains("2.500"))) {
+            return 2000.0;
+        }
         if (lower.contains("bs")) {
             if (lower.contains("2.500") && lower.contains("3.500")) return 3000.0;
             if (lower.contains("3.501") && lower.contains("5.000")) return 4250.0;
@@ -126,30 +304,43 @@ public class Estadistica {
         return null;
     }
 
-    /** Mapea etiquetas Likert a su valor numérico estándar (1 a 5). */
+    /** Mapea etiquetas Likert a su valor numérico estándar (escala 1 a 4 según especificación ARCUSUR y Tabla 3). */
     public static Double mapearLikert(String lower) {
-        if (lower.contains("totalmente de acuerdo") || lower.contains("muy de acuerdo")
-                || lower.contains("muy satisfecho") || lower.contains("excelente")) {
-            return 5.0;
-        }
-        if (lower.contains("parcialmente de acuerdo")) {
-            return 3.0;
-        }
-        if (lower.contains("de acuerdo") || lower.contains("satisfecho") || lower.contains("bueno")) {
-            return 4.0;
-        }
-        if (lower.contains("neutral") || lower.contains("ni de acuerdo") || lower.contains("regular")
-                || lower.contains("algo satisfecho")) {
-            return 3.0;
-        }
-        if (lower.contains("totalmente desacuerdo") || lower.contains("totalmente en desacuerdo")
-                || lower.contains("muy insatisfecho") || lower.contains("muy malo")) {
+        if (lower == null) return null;
+        String s = lower.trim().toLowerCase();
+
+        // 1. Totalmente en desacuerdo / muy insatisfecho / 1
+        if (s.contains("totalmente desacuerdo") || s.contains("totalmente en desacuerdo")
+                || s.contains("muy insatisfecho") || s.contains("muy malo")) {
             return 1.0;
         }
-        if (lower.contains("en desacuerdo") || lower.contains("desacuerdo")
-                || lower.contains("insatisfecho") || lower.contains("malo")) {
+
+        // 2. Totalmente de acuerdo / muy de acuerdo / muy satisfecho / 4
+        if (s.contains("totalmente de acuerdo") || s.contains("muy de acuerdo")
+                || s.contains("muy satisfecho") || s.contains("excelente")) {
+            return 4.0;
+        }
+
+        // 3. En desacuerdo / insatisfecho / malo
+        if (s.contains("en desacuerdo") || s.contains("desacuerdo")
+                || s.contains("insatisfecho") || s.contains("malo")) {
             return 2.0;
         }
+
+        // 4. Neutrales o intermedios (EVALUAR ANTES de 'de acuerdo' y 'satisfecho' para evitar falsos positivos)
+        if (s.contains("neutral") || s.contains("ni de acuerdo") || s.contains("regular")
+                || s.contains("algo satisfecho")) {
+            return 2.5;
+        }
+
+        // 5. De acuerdo / satisfecho / parcialmente de acuerdo
+        if (s.contains("parcialmente de acuerdo")) {
+            return 3.0;
+        }
+        if (s.contains("de acuerdo") || s.contains("satisfecho") || s.contains("bueno")) {
+            return 3.0;
+        }
+
         return null; // "no sabe" u otros
     }
 
@@ -232,6 +423,14 @@ public class Estadistica {
 
         // 2. Evaluar si es Binaria / Dicotómica (2 categorías únicas, ej. Hombre/Mujer, SI/NO)
         LinkedHashMap<String, Integer> frecuencias = frecuenciaAbsoluta(datosValidos);
+        if (frecuencias.isEmpty()) {
+            return new ResumenEstadistico(
+                    "Sin Datos", "—", "Sin Datos", "—", "Sin Datos", "—",
+                    "Sin Datos", "—", "Muestra Válida (N)", "0",
+                    0, 0, 0, 0, 0, 0
+            );
+        }
+
         if (frecuencias.size() == 2) {
             Iterator<Map.Entry<String, Integer>> it = frecuencias.entrySet().iterator();
             Map.Entry<String, Integer> e1 = it.next();
@@ -242,6 +441,13 @@ public class Estadistica {
 
         // 3. Cualitativa Nominal Pura (Enfoque A: Estadísticos Categóricos)
         List<Map.Entry<String, Integer>> lista = new ArrayList<>(frecuencias.entrySet());
+        if (lista.isEmpty()) {
+            return new ResumenEstadistico(
+                    "Sin Datos", "—", "Sin Datos", "—", "Sin Datos", "—",
+                    "Sin Datos", "—", "Muestra Válida (N)", "0",
+                    0, 0, 0, 0, 0, 0
+            );
+        }
         String top1Nombre = lista.get(0).getKey();
         int top1Count = lista.get(0).getValue();
         String top2Nombre = lista.size() > 1 ? lista.get(1).getKey() : "";
