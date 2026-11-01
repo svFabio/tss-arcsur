@@ -12,13 +12,16 @@ import java.util.Map;
 
 public class ServicioSupabase {
 
-    private static final String URL_BASE = "https://favjltrahhrlqvqfdcjh.supabase.co/rest/v1/";
-    private static final String API_KEY = "sb_publishable_f6b7av8RchmIgoGFYnDxaQ_gFmJQPqY";
+    private static final String URL_BASE = System.getenv().getOrDefault("ARCUSUR_SUPABASE_URL", "https://favjltrahhrlqvqfdcjh.supabase.co/rest/v1/");
+    private static final String API_KEY = System.getenv().getOrDefault("ARCUSUR_SUPABASE_KEY", "sb_publishable_f6b7av8RchmIgoGFYnDxaQ_gFmJQPqY");
 
     public static boolean insertarRegistro(String tabla, Map<String, String> valores) {
+        HttpURLConnection conn = null;
         try {
             URL url = java.net.URI.create(URL_BASE + tabla).toURL();
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(10000);
             conn.setRequestMethod("POST");
             conn.setRequestProperty("apikey", API_KEY);
             conn.setRequestProperty("Authorization", "Bearer " + API_KEY);
@@ -34,20 +37,25 @@ public class ServicioSupabase {
             }
 
             int codigoRespuesta = conn.getResponseCode();
-            conn.disconnect();
-
             return (codigoRespuesta >= 200 && codigoRespuesta < 300);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
     public static ArrayList<HashMap<String, String>> obtenerRegistros(String tabla) {
         ArrayList<HashMap<String, String>> registros = new ArrayList<>();
+        HttpURLConnection conn = null;
         try {
             URL url = java.net.URI.create(URL_BASE + tabla + "?select=*").toURL();
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(10000);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("apikey", API_KEY);
             conn.setRequestProperty("Authorization", "Bearer " + API_KEY);
@@ -55,18 +63,21 @@ public class ServicioSupabase {
 
             int codigo = conn.getResponseCode();
             if (codigo >= 200 && codigo < 300) {
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-                StringBuilder sb = new StringBuilder();
-                String linea;
-                while ((linea = br.readLine()) != null) {
-                    sb.append(linea);
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder sb = new StringBuilder();
+                    String linea;
+                    while ((linea = br.readLine()) != null) {
+                        sb.append(linea);
+                    }
+                    registros = parsearJsonArray(sb.toString());
                 }
-                br.close();
-                registros = parsearJsonArray(sb.toString());
             }
-            conn.disconnect();
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
         return registros;
     }
@@ -164,6 +175,8 @@ public class ServicioSupabase {
 
         boolean dentroString = false;
         boolean escape = false;
+        int braceDepth = 0;
+        int bracketDepth = 0;
         int start = 0;
         ArrayList<String> pares = new ArrayList<>();
 
@@ -181,9 +194,15 @@ public class ServicioSupabase {
                 dentroString = !dentroString;
                 continue;
             }
-            if (c == ',' && !dentroString) {
-                pares.add(str.substring(start, i).trim());
-                start = i + 1;
+            if (!dentroString) {
+                if (c == '{') braceDepth++;
+                else if (c == '}') braceDepth--;
+                else if (c == '[') bracketDepth++;
+                else if (c == ']') bracketDepth--;
+                else if (c == ',' && braceDepth == 0 && bracketDepth == 0) {
+                    pares.add(str.substring(start, i).trim());
+                    start = i + 1;
+                }
             }
         }
         if (start < str.length()) {
@@ -191,7 +210,7 @@ public class ServicioSupabase {
         }
 
         for (String par : pares) {
-            int separador = par.indexOf(':');
+            int separador = encontrarSeparadorClaveValor(par);
             if (separador != -1) {
                 String clave = desescapar(par.substring(0, separador).trim());
                 String valor = desescapar(par.substring(separador + 1).trim());
@@ -203,15 +222,65 @@ public class ServicioSupabase {
         return mapa;
     }
 
+    private static int encontrarSeparadorClaveValor(String par) {
+        boolean dentroString = false;
+        boolean escape = false;
+        for (int i = 0; i < par.length(); i++) {
+            char c = par.charAt(i);
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (c == '\\') {
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                dentroString = !dentroString;
+                continue;
+            }
+            if (c == ':' && !dentroString) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static String desescapar(String s) {
+        if (s == null) return "";
         String res = s.trim();
+        boolean estabaEntrecomillado = false;
         if (res.startsWith("\"") && res.endsWith("\"") && res.length() >= 2) {
             res = res.substring(1, res.length() - 1);
+            estabaEntrecomillado = true;
         }
-        if (res.equalsIgnoreCase("null")) return "";
+        if (!estabaEntrecomillado && res.equalsIgnoreCase("null")) return "";
+
+        res = decodificarUnicode(res);
+
         return res.replace("\\\"", "\"")
                   .replace("\\\\", "\\")
                   .replace("\\n", "\n")
+                  .replace("\\r", "\r")
                   .replace("\\t", "\t");
+    }
+
+    private static String decodificarUnicode(String input) {
+        if (input == null || !input.contains("\\u")) return input;
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        while (i < input.length()) {
+            if (i + 5 < input.length() && input.charAt(i) == '\\' && input.charAt(i + 1) == 'u') {
+                try {
+                    int codePoint = Integer.parseInt(input.substring(i + 2, i + 6), 16);
+                    sb.append((char) codePoint);
+                    i += 6;
+                    continue;
+                } catch (NumberFormatException ignored) {}
+            }
+            sb.append(input.charAt(i));
+            i++;
+        }
+        return sb.toString();
     }
 }

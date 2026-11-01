@@ -194,8 +194,8 @@ public class ExportadorDatos {
             if (kpis != null) {
                 for (Map.Entry<String, String> entry : kpis.entrySet()) {
                     html.append("<div class=\"kpi-card\">\n");
-                    html.append("<div class=\"kpi-val\">").append(entry.getValue()).append("</div>\n");
-                    html.append("<div class=\"kpi-lbl\">").append(entry.getKey()).append("</div>\n");
+                    html.append("<div class=\"kpi-val\">").append(escaparHTML(entry.getValue())).append("</div>\n");
+                    html.append("<div class=\"kpi-lbl\">").append(escaparHTML(entry.getKey())).append("</div>\n");
                     html.append("</div>\n");
                 }
             }
@@ -206,7 +206,7 @@ public class ExportadorDatos {
             html.append("<div class=\"findings-box\">\n<ul>\n");
             if (hallazgos != null && !hallazgos.isEmpty()) {
                 for (String h : hallazgos) {
-                    html.append("<li>").append(h).append("</li>\n");
+                    html.append("<li>").append(escaparHTML(h)).append("</li>\n");
                 }
             } else {
                 html.append("<li>Datos procesados correctamente conforme al pipeline metodologico.</li>\n");
@@ -216,16 +216,16 @@ public class ExportadorDatos {
             // Matriz si está disponible
             if (matrizContingencia != null && matrizContingencia.length > 0) {
                 html.append("<h2>3. Matriz de Frecuencia Cruzada Representativa</h2>\n");
-                html.append("<p>Cruce: <strong>").append(var1).append("</strong> vs. <strong>").append(var2).append("</strong></p>\n");
+                html.append("<p>Cruce: <strong>").append(escaparHTML(var1)).append("</strong> vs. <strong>").append(escaparHTML(var2)).append("</strong></p>\n");
                 html.append("<table>\n");
                 for (int i = 0; i < matrizContingencia.length; i++) {
                     html.append("<tr>\n");
                     for (int j = 0; j < matrizContingencia[i].length; j++) {
                         String celda = matrizContingencia[i][j] != null ? matrizContingencia[i][j].toString() : "";
                         if (i == 0 || j == 0) {
-                            html.append("<th>").append(celda).append("</th>");
+                            html.append("<th>").append(escaparHTML(celda)).append("</th>");
                         } else {
-                            html.append("<td>").append(celda).append("</td>");
+                            html.append("<td>").append(escaparHTML(celda)).append("</td>");
                         }
                     }
                     html.append("\n</tr>\n");
@@ -233,7 +233,7 @@ public class ExportadorDatos {
                 html.append("</table>\n");
 
                 if (resultadoChi != null && !resultadoChi.isEmpty()) {
-                    html.append("<div class=\"chi-box\"><strong>Contraste de Hipotesis:</strong> ").append(resultadoChi).append("</div>\n");
+                    html.append("<div class=\"chi-box\"><strong>Contraste de Hipotesis:</strong> ").append(escaparHTML(resultadoChi)).append("</div>\n");
                 }
             }
 
@@ -252,9 +252,33 @@ public class ExportadorDatos {
         }
     }
 
+    public static String escaparHTML(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '&':  sb.append("&amp;"); break;
+                case '<':  sb.append("&lt;"); break;
+                case '>':  sb.append("&gt;"); break;
+                case '"':  sb.append("&quot;"); break;
+                case '\'': sb.append("&#39;"); break;
+                default:   sb.append(c); break;
+            }
+        }
+        return sb.toString();
+    }
+
     private static String escaparCSV(String texto) {
         if (texto == null) return "";
-        return texto.replace("\"", "\"\"");
+        String limpio = texto.replace("\"", "\"\"").replace("\r\n", " ").replace("\n", " ").replace("\r", " ");
+        if (!limpio.isEmpty()) {
+            char primerChar = limpio.charAt(0);
+            if (primerChar == '=' || primerChar == '+' || primerChar == '-' || primerChar == '@' || primerChar == '\t') {
+                limpio = "'" + limpio;
+            }
+        }
+        return limpio;
     }
 
     private static String obtenerFechaActual() {

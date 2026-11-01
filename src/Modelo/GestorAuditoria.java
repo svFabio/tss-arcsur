@@ -15,9 +15,9 @@ public class GestorAuditoria {
 
         public EntradaAuditoria(String tipoAccion, String descripcion, String usuario) {
             this.fechaHora = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-            this.tipoAccion = tipoAccion;
-            this.descripcion = descripcion;
-            this.usuario = usuario != null ? usuario : "Comite Evaluador ARCUSUR";
+            this.tipoAccion = tipoAccion != null ? tipoAccion.replace("\r", " ").replace("\n", " ").trim() : "ACCION";
+            this.descripcion = descripcion != null ? descripcion.replace("\r", " ").replace("\n", " ").trim() : "";
+            this.usuario = usuario != null ? usuario.replace("\r", " ").replace("\n", " ").trim() : "Comite Evaluador ARCUSUR";
         }
 
         public String getFechaHora() { return fechaHora; }
@@ -31,8 +31,10 @@ public class GestorAuditoria {
         }
     }
 
+    private static final int MAX_HISTORIAL_MEMORIA = 5000;
     private static final List<EntradaAuditoria> historial = Collections.synchronizedList(new ArrayList<>());
     private static final String ARCHIVO_LOG = "auditoria_arcsur.log";
+    private static final Object FILE_LOCK = new Object();
 
     static {
         registrar("INICIO_SISTEMA", "Sistema tss-arcsur iniciado. Sesion de auditoria activa.", "Sistema");
@@ -44,14 +46,21 @@ public class GestorAuditoria {
 
     public static void registrar(String tipoAccion, String descripcion, String usuario) {
         EntradaAuditoria entrada = new EntradaAuditoria(tipoAccion, descripcion, usuario);
-        historial.add(entrada);
+        synchronized (historial) {
+            if (historial.size() >= MAX_HISTORIAL_MEMORIA) {
+                historial.remove(0);
+            }
+            historial.add(entrada);
+        }
 
-        // Guardar en archivo log persistente
-        try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(ARCHIVO_LOG, true), StandardCharsets.UTF_8))) {
-            bw.write(entrada.toString());
-            bw.newLine();
-        } catch (Exception ignored) {
-            // No interrumpir ejecución si falla escritura a disco
+        // Guardar en archivo log persistente de forma sincronizada
+        synchronized (FILE_LOCK) {
+            try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(ARCHIVO_LOG, true), StandardCharsets.UTF_8))) {
+                bw.write(entrada.toString());
+                bw.newLine();
+            } catch (Exception e) {
+                System.err.println("[GestorAuditoria] Advertencia: No se pudo escribir en log: " + e.getMessage());
+            }
         }
     }
 
