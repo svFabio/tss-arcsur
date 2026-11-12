@@ -58,8 +58,8 @@ public class GestorAuditoria {
             try (BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(ARCHIVO_LOG, true), StandardCharsets.UTF_8))) {
                 bw.write(entrada.toString());
                 bw.newLine();
-            } catch (Exception e) {
-                System.err.println("[GestorAuditoria] Advertencia: No se pudo escribir en log: " + e.getMessage());
+            } catch (Exception ignored) {
+                // El historial persiste en memoria aunque el archivo no se pueda escribir
             }
         }
     }
@@ -90,7 +90,6 @@ public class GestorAuditoria {
             bw.write(obtenerTextoCompleto());
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
             return false;
         }
     }

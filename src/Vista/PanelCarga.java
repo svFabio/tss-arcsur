@@ -6,6 +6,7 @@ import java.awt.*;
 public class PanelCarga extends JPanel {
     public JButton btnCargarTitulados;
     public JButton btnCargarEmpleadores;
+    public JButton btnCargarOficiales;
     public JButton btnDatosPrueba;
     public JButton btnCargarNube;
     public JLabel lblEstadoTitulados;
@@ -23,6 +24,7 @@ public class PanelCarga extends JPanel {
 
         btnCargarTitulados = new JButton(ConfiguracionTextos.BOTON_CARGAR_TITULADOS);
         btnCargarEmpleadores = new JButton(ConfiguracionTextos.BOTON_CARGAR_EMPLEADORES);
+        btnCargarOficiales = new JButton("Cargar Datos Oficiales (Encuestas Limpias)");
         btnDatosPrueba = new JButton("Cargar Datos de Prueba (Simulados)");
         btnCargarNube = new JButton("Descargar Respuestas de la Nube (Supabase)");
 
@@ -31,6 +33,8 @@ public class PanelCarga extends JPanel {
 
         estilizarBoton(btnCargarTitulados);
         estilizarBoton(btnCargarEmpleadores);
+        estilizarBoton(btnCargarOficiales);
+        btnCargarOficiales.setBackground(new Color(21, 101, 192));
         estilizarBoton(btnDatosPrueba);
         estilizarBoton(btnCargarNube);
         btnCargarNube.setBackground(ConfiguracionColores.COLOR_EXITO);
@@ -46,9 +50,12 @@ public class PanelCarga extends JPanel {
         gbc.gridx = 1; add(lblEstadoEmpleadores, gbc);
 
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        add(btnDatosPrueba, gbc);
+        add(btnCargarOficiales, gbc);
 
         gbc.gridy = 4;
+        add(btnDatosPrueba, gbc);
+
+        gbc.gridy = 5;
         add(btnCargarNube, gbc);
     }
 

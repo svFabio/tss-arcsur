@@ -283,7 +283,7 @@ public class TestStressDatosSeguridad {
         tempVacio.deleteOnExit();
         GestorDatos gestorVacio = new GestorDatos();
         boolean resVacio = gestorVacio.cargarCSV(tempVacio, true);
-        boolean resNull = gestorVacio.cargarCSV(null, true);
+        boolean resNull = gestorVacio.cargarCSV((File) null, true);
         assertTest("Rechazo controlado de archivo vacío y nulo", !resVacio && !resNull,
                 "Archivos vacíos o nulos devuelven false de forma segura sin excepciones");
 

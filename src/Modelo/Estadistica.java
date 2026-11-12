@@ -473,6 +473,7 @@ public class Estadistica {
     }
 
     public static LinkedHashMap<String, Integer> frecuenciaAbsoluta(ArrayList<String> datos) {
+        if (datos == null) return new LinkedHashMap<>();
         boolean esMultiple = false;
         for (String d : datos) {
             if (d != null && d.contains(";")) {

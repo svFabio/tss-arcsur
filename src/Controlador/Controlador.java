@@ -29,46 +29,85 @@ public class Controlador implements ActionListener {
         // Botones de carga
         this.vista.panelCarga.btnCargarTitulados.addActionListener(this);
         this.vista.panelCarga.btnCargarEmpleadores.addActionListener(this);
+        this.vista.panelCarga.btnCargarOficiales.addActionListener(this);
         this.vista.panelCarga.btnDatosPrueba.addActionListener(this);
         this.vista.panelCarga.btnCargarNube.addActionListener(this);
 
         // Selectores de análisis univariado
-        this.vista.panelTitulados.comboVariables.addActionListener(e -> actualizarAnalisisUnivariante(true));
-        this.vista.panelEmpleadores.comboVariables.addActionListener(e -> actualizarAnalisisUnivariante(false));
+        this.vista.panelTitulados.comboVariables.addActionListener(e -> ejecutarSeguro(() -> actualizarAnalisisUnivariante(true)));
+        this.vista.panelEmpleadores.comboVariables.addActionListener(e -> ejecutarSeguro(() -> actualizarAnalisisUnivariante(false)));
 
         // Exportación en análisis univariado
-        this.vista.panelTitulados.btnExportarCSV.addActionListener(e -> exportarUnivariado(true));
-        this.vista.panelEmpleadores.btnExportarCSV.addActionListener(e -> exportarUnivariado(false));
+        this.vista.panelTitulados.btnExportarCSV.addActionListener(e -> ejecutarSeguro(() -> exportarUnivariado(true)));
+        this.vista.panelEmpleadores.btnExportarCSV.addActionListener(e -> ejecutarSeguro(() -> exportarUnivariado(false)));
 
         // Cruces y Chi-Cuadrada
-        this.vista.panelCruces.btnCalcular.addActionListener(e -> calcularChiCuadrada());
-        this.vista.panelCruces.btnExportarCSV.addActionListener(e -> exportarMatrizCruces());
+        this.vista.panelCruces.btnCalcular.addActionListener(e -> ejecutarSeguro(this::calcularChiCuadrada));
+        this.vista.panelCruces.btnExportarCSV.addActionListener(e -> ejecutarSeguro(this::exportarMatrizCruces));
 
         // Dashboard Ejecutivo
-        this.vista.panelDashboard.btnActualizar.addActionListener(e -> actualizarDashboard());
-        this.vista.panelDashboard.btnReporteHTML.addActionListener(e -> exportarReporteEjecutivoHTML());
-        this.vista.panelDashboard.btnExportarDatosDepurados.addActionListener(e -> exportarDatosDepurados());
-        this.vista.panelDashboard.btnAuditoria.addActionListener(e -> mostrarVentanaAuditoria());
+        this.vista.panelDashboard.btnActualizar.addActionListener(e -> ejecutarSeguro(this::actualizarDashboard));
+        this.vista.panelDashboard.btnReporteHTML.addActionListener(e -> ejecutarSeguro(this::exportarReporteEjecutivoHTML));
+        this.vista.panelDashboard.btnExportarDatosDepurados.addActionListener(e -> ejecutarSeguro(this::exportarDatosDepurados));
+        this.vista.panelDashboard.btnAuditoria.addActionListener(e -> ejecutarSeguro(this::mostrarVentanaAuditoria));
 
         // Sincronización reactiva entre pestañas
-        this.vista.pestanas.addChangeListener(e -> {
+        this.vista.pestanas.addChangeListener(e -> ejecutarSeguro(() -> {
             int selected = this.vista.pestanas.getSelectedIndex();
             if (selected == 1 && (modelo.hayDatosTitulados() || modelo.hayDatosEmpleadores())) {
                 actualizarDashboard();
             }
-        });
+        }));
+    }
+
+    /** Ejecuta una accion de la interfaz atrapando cualquier excepcion para que nunca llegue a la consola ni rompa la ventana. */
+    private void ejecutarSeguro(Runnable accion) {
+        try {
+            accion.run();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(vista, "Ocurrio un error inesperado: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Version de ejecutarSeguro para trabajo de fondo (hilos), que no puede abrir dialogos fuera del EDT. */
+    private void ejecutarSeguroEnHilo(Runnable tarea, Runnable alFallar) {
+        try {
+            tarea.run();
+        } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> {
+                if (alFallar != null) alFallar.run();
+                JOptionPane.showMessageDialog(vista, "Ocurrio un error inesperado: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            });
+        }
     }
 
     public void iniciar() {
+        // Auto-carga de datos oficiales empaquetados en el JAR (soporte nativo para CheerpJ / Web)
+        boolean okTit = modelo.cargarCSVRecurso("/Recursos/titulados_limpio.csv", true);
+        boolean okEmp = modelo.cargarCSVRecurso("/Recursos/empleadores_limpio.csv", false);
+        if (okTit || okEmp) {
+            if (okTit) vista.panelCarga.lblEstadoTitulados.setText("Titulados: Oficial (" + modelo.getCantidadTitulados() + " reg)");
+            if (okEmp) vista.panelCarga.lblEstadoEmpleadores.setText("Empleadores: Oficial (" + modelo.getCantidadEmpleadores() + " reg)");
+            habilitarAnalisis();
+            actualizarDashboard();
+        }
         vista.setVisible(true);
+        vista.revalidate();
+        vista.repaint();
     }
 
     @Override
     public void actionPerformed(ActionEvent e) {
+        ejecutarSeguro(() -> manejarAccion(e));
+    }
+
+    private void manejarAccion(ActionEvent e) {
         if (e.getSource() == vista.panelCarga.btnCargarTitulados) {
             cargarArchivo(true);
         } else if (e.getSource() == vista.panelCarga.btnCargarEmpleadores) {
             cargarArchivo(false);
+        } else if (e.getSource() == vista.panelCarga.btnCargarOficiales) {
+            cargarDatosOficiales();
         } else if (e.getSource() == vista.panelCarga.btnDatosPrueba) {
             DatosEjemplo.cargarDatos(modelo);
             vista.panelCarga.lblEstadoTitulados.setText("Titulados: Simulado (" + modelo.getCantidadTitulados() + " reg)");
@@ -82,10 +121,28 @@ public class Controlador implements ActionListener {
         }
     }
 
+    private void cargarDatosOficiales() {
+        boolean okTit = modelo.cargarCSVRecurso("/Recursos/titulados_limpio.csv", true);
+        boolean okEmp = modelo.cargarCSVRecurso("/Recursos/empleadores_limpio.csv", false);
+        if (okTit || okEmp) {
+            if (okTit) vista.panelCarga.lblEstadoTitulados.setText("Titulados: Oficial (" + modelo.getCantidadTitulados() + " reg)");
+            if (okEmp) vista.panelCarga.lblEstadoEmpleadores.setText("Empleadores: Oficial (" + modelo.getCantidadEmpleadores() + " reg)");
+            GestorAuditoria.registrar("CARGA_OFICIAL", "Cargados " + modelo.getCantidadTitulados() + " titulados y " +
+                    modelo.getCantidadEmpleadores() + " empleadores desde recursos internos.");
+            habilitarAnalisis();
+            actualizarDashboard();
+            JOptionPane.showMessageDialog(vista, "Datos oficiales cargados correctamente:\n" +
+                    "- Titulados: " + modelo.getCantidadTitulados() + " registros\n" +
+                    "- Empleadores: " + modelo.getCantidadEmpleadores() + " registros");
+        } else {
+            JOptionPane.showMessageDialog(vista, "No se encontraron los archivos CSV en /Recursos/.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void cargarDesdeNube() {
         vista.panelCarga.btnCargarNube.setEnabled(false);
         vista.panelCarga.btnCargarNube.setText("Descargando de Supabase...");
-        new Thread(() -> {
+        new Thread(() -> ejecutarSeguroEnHilo(() -> {
             boolean okTit = modelo.cargarDesdeSupabase(true);
             boolean okEmp = modelo.cargarDesdeSupabase(false);
             SwingUtilities.invokeLater(() -> {
@@ -113,7 +170,10 @@ public class Controlador implements ActionListener {
                     JOptionPane.showMessageDialog(vista, "Aun no hay registros en la base de datos o fallo la conexion.", "Aviso", JOptionPane.WARNING_MESSAGE);
                 }
             });
-        }).start();
+        }, () -> {
+            vista.panelCarga.btnCargarNube.setEnabled(true);
+            vista.panelCarga.btnCargarNube.setText("Descargar Respuestas de la Nube (Supabase)");
+        })).start();
     }
 
     private void cargarArchivo(boolean esTitulados) {
@@ -121,7 +181,7 @@ public class Controlador implements ActionListener {
         int seleccion = chooser.showOpenDialog(vista);
         if (seleccion == JFileChooser.APPROVE_OPTION) {
             File archivo = chooser.getSelectedFile();
-            new Thread(() -> {
+            new Thread(() -> ejecutarSeguroEnHilo(() -> {
                 boolean exito = modelo.cargarCSV(archivo, esTitulados);
                 SwingUtilities.invokeLater(() -> {
                     if (exito) {
@@ -139,7 +199,7 @@ public class Controlador implements ActionListener {
                         JOptionPane.showMessageDialog(vista, "Error al cargar el archivo. Verifique el formato CSV.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
-            }).start();
+            }, null)).start();
         }
     }
 
@@ -283,7 +343,7 @@ public class Controlador implements ActionListener {
             File tempDest = chooser.getSelectedFile();
             final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
 
-            new Thread(() -> {
+            new Thread(() -> ejecutarSeguroEnHilo(() -> {
                 boolean ok = ExportadorDatos.exportarMatrizContingenciaCSV(destino, ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
                 SwingUtilities.invokeLater(() -> {
                     if (ok) {
@@ -293,7 +353,7 @@ public class Controlador implements ActionListener {
                         JOptionPane.showMessageDialog(vista, "Error al exportar el archivo.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
-            }).start();
+            }, null)).start();
         }
     }
 
@@ -314,7 +374,7 @@ public class Controlador implements ActionListener {
             File tempDest = chooser.getSelectedFile();
             final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
 
-            new Thread(() -> {
+            new Thread(() -> ejecutarSeguroEnHilo(() -> {
                 boolean ok = ExportadorDatos.exportarResumenUnivariadoCSV(destino, variable, panel.modeloTabla, panel.getResumenActual());
                 SwingUtilities.invokeLater(() -> {
                     if (ok) {
@@ -324,7 +384,7 @@ public class Controlador implements ActionListener {
                         JOptionPane.showMessageDialog(vista, "Error al exportar el reporte univariado.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
-            }).start();
+            }, null)).start();
         }
     }
 
@@ -357,7 +417,7 @@ public class Controlador implements ActionListener {
             File tempDest = chooser.getSelectedFile();
             final File destino = !tempDest.getName().toLowerCase().endsWith(".csv") ? new File(tempDest.getAbsolutePath() + ".csv") : tempDest;
 
-            new Thread(() -> {
+            new Thread(() -> ejecutarSeguroEnHilo(() -> {
                 boolean ok = ExportadorDatos.exportarDatasetCSV(destino, cols, datos);
                 SwingUtilities.invokeLater(() -> {
                     if (ok) {
@@ -367,7 +427,7 @@ public class Controlador implements ActionListener {
                         JOptionPane.showMessageDialog(vista, "Error al exportar dataset.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
-            }).start();
+            }, null)).start();
         }
     }
 
@@ -386,7 +446,7 @@ public class Controlador implements ActionListener {
 
             List<String> hallazgos = generarDiagnosticoEstrategico();
 
-            new Thread(() -> {
+            new Thread(() -> ejecutarSeguroEnHilo(() -> {
                 boolean ok = ExportadorDatos.exportarReporteEjecutivoHTML(destino, kpis, hallazgos,
                         ultimaMatrizChi, ultimoResultadoChi, ultimaVar1, ultimaVar2);
 
@@ -407,7 +467,7 @@ public class Controlador implements ActionListener {
                         JOptionPane.showMessageDialog(vista, "Error al generar informe HTML.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 });
-            }).start();
+            }, null)).start();
         }
     }
 
@@ -429,12 +489,12 @@ public class Controlador implements ActionListener {
         JButton btnExportarLog = new JButton("Guardar Log como Archivo TXT");
         JButton btnCerrar = new JButton("Cerrar");
 
-        btnExportarLog.addActionListener(e -> {
+        btnExportarLog.addActionListener(e -> ejecutarSeguro(() -> {
             JFileChooser chooser = new JFileChooser();
             chooser.setSelectedFile(new File("auditoria_arcsur.txt"));
             if (chooser.showSaveDialog(dlg) == JFileChooser.APPROVE_OPTION) {
                 File f = chooser.getSelectedFile();
-                new Thread(() -> {
+                new Thread(() -> ejecutarSeguroEnHilo(() -> {
                     boolean ok = GestorAuditoria.exportarLog(f);
                     SwingUtilities.invokeLater(() -> {
                         if (ok) {
@@ -443,9 +503,9 @@ public class Controlador implements ActionListener {
                             JOptionPane.showMessageDialog(dlg, "Error al guardar el log de auditoria.", "Error", JOptionPane.ERROR_MESSAGE);
                         }
                     });
-                }).start();
+                }, null)).start();
             }
-        });
+        }));
 
         btnCerrar.addActionListener(e -> dlg.dispose());
 
@@ -565,6 +625,9 @@ public class Controlador implements ActionListener {
     }
 
     public static void main(String[] args) {
+        Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
+            // Ultima red de seguridad: ningun hilo debe imprimir su traza en consola ni tumbar la app
+        });
         SwingUtilities.invokeLater(() -> {
             GestorDatos modelo = new GestorDatos();
             VentanaPrincipal vista = new VentanaPrincipal();

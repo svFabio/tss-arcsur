@@ -74,6 +74,7 @@ public class PanelAnalisis extends JPanel {
         tablaFrecuencias = new JTable(modeloTabla);
         tablaFrecuencias.setRowHeight(22);
         tablaFrecuencias.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        tablaFrecuencias.getTableHeader().setReorderingAllowed(false);
         JScrollPane scrollTabla = new JScrollPane(tablaFrecuencias);
 
         graficoBarras = new GraficoBarras();

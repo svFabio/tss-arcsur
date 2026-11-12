@@ -18,8 +18,22 @@ public class GestorDatos {
         if (archivo == null || !archivo.exists() || archivo.length() == 0) {
             return false;
         }
+        try {
+            return cargarCSV(new FileInputStream(archivo), esTitulados);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Carga los CSV oficiales empaquetados como recurso del JAR (soporte nativo para CheerpJ / Web). */
+    public boolean cargarCSVRecurso(String rutaRecurso, boolean esTitulados) {
+        InputStream is = getClass().getResourceAsStream(rutaRecurso);
+        return is != null && cargarCSV(is, esTitulados);
+    }
+
+    public boolean cargarCSV(InputStream is, boolean esTitulados) {
         ArrayList<HashMap<String, String>> datos = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(archivo), "UTF-8"))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"))) {
             String cabecera = br.readLine();
             if (cabecera == null || cabecera.trim().isEmpty() || cabecera.contains("\0")) {
                 return false;
@@ -127,7 +141,7 @@ public class GestorDatos {
 
     public ArrayList<String> obtenerColumnaFiltrada(boolean esTitulados, String nombreColumna,
                                                      String filtroColumna, String filtroValor) {
-        if (filtroValor.equals("Todos")) return obtenerColumna(esTitulados, nombreColumna);
+        if ("Todos".equals(filtroValor)) return obtenerColumna(esTitulados, nombreColumna);
 
         ArrayList<HashMap<String, String>> datos = esTitulados ? datosTitulados : datosEmpleadores;
         ArrayList<String> valores = new ArrayList<>();

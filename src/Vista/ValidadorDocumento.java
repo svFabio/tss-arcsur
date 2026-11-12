@@ -113,7 +113,7 @@ public class ValidadorDocumento extends PlainDocument {
                 // Letras (con tildes/ñ), números, espacios y puntuación empresarial usual
                 return esLetraEspanol(c) || (c >= '0' && c <= '9') || c == ' '
                         || c == '.' || c == ',' || c == '-' || c == '/' || c == '&'
-                        || c == '(' || c == ')' || c == '\'' || c == '"' || c == '\u00BF' || c == '\u00A1';
+                        || c == '(' || c == ')' || c == '\'' || c == '\u00BF' || c == '\u00A1';
 
             case EMAIL:
                 // Letras ASCII, números y símbolos permitidos en emails
@@ -132,7 +132,7 @@ public class ValidadorDocumento extends PlainDocument {
                 // Para áreas de texto: letras (tildes/ñ), números, saltos y signos comunes (incluyendo ¿ y ¡)
                 if (c == '\n' || c == '\r' || c == '\t' || c == ' ') return true;
                 if (esLetraEspanol(c) || (c >= '0' && c <= '9')) return true;
-                String puntuacion = ".,;:!?\u00BF\u00A1()[]{}-_\"'/+#%*$&";
+                String puntuacion = ".,;:!?\u00BF\u00A1()[]{}-_'/+#%*$&";
                 return puntuacion.indexOf(c) >= 0;
 
             default:

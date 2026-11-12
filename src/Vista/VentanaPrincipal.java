@@ -15,7 +15,11 @@ public class VentanaPrincipal extends JFrame {
 
     public VentanaPrincipal() {
         setTitle(ConfiguracionTextos.TITULO_APLICACION);
-        setSize(ConfiguracionVentana.ANCHO_VENTANA, ConfiguracionVentana.ALTO_VENTANA);
+        Dimension pantalla = Toolkit.getDefaultToolkit().getScreenSize();
+        int ancho = Math.max(ConfiguracionVentana.ANCHO_MINIMO, (int) (pantalla.width * ConfiguracionVentana.PORCENTAJE_ANCHO));
+        int alto = Math.max(ConfiguracionVentana.ALTO_MINIMO, (int) (pantalla.height * ConfiguracionVentana.PORCENTAJE_ALTO));
+        setSize(ancho, alto);
+        setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         getContentPane().setBackground(ConfiguracionColores.COLOR_FONDO);
